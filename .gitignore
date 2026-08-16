@@ -1,0 +1,12 @@
+*.log
+find_*.txt
+submit_*
+salvage_finds*
+receipts_*
+*.bin
+*.v.bin
+*.tgz
+sc_state*.json
+*.manifest.json
+__pycache__/
+.sc_cache/
