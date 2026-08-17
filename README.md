@@ -276,3 +276,8 @@ appear, by name, in the corrections ledger. Companion papers: the
 crossover/2-adic swap paper, the squarefree singular-series paper, and
 the pipeline/cost-law paper built from this repository. License and
 DOI land with the public release.*
+
+## Environment
+Python 3.10+, numpy (gmpy2 for verification). GPU path: CUDA 12+
+(kernel ships prebuilt in deploy/kit_v1). CPU-height path: PFGW
+(sourceforge; expression syntax used throughout).
