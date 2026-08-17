@@ -55,3 +55,22 @@ ALL live-theater prices (shelf-interior u<=1.41, untouched).
 4. Factory hygiene: confirm deployed scanhunt enforces gcd(k,d)=1
    (one grep, info only, live raid untouched).
 5. Zenodo/paper: T1 section + Renyer courtesy note.
+
+## ADDENDUM v5 (2026-08-17 late): FULL-UNIVERSE CLOSURE
+H9  PASS campaigns: monument +0.1% / strike -0.0% / record +0.2%
+H10 PASS designs 5/5 within 1.7% (best-effort zd)
+H11 PASS raid610 ladder ALL SEVEN rings within 0.8%, incl. ring-1
+    smooth-zone stress (1.008); ln_n0 reproduced 1403.4 vs 1403.3
+=> Certified sum reproduces 100% of the calibration universe:
+20/20 published records, 3/3 campaigns, 5/5 designs, 7/7
+production rings, 64 fresh anchors, fixed-m transects. Empirical
+half of Theorem-1: CLOSED at instrument precision.
+
+CORRECTIONS (Claude): (1) siege-direction prediction wrong --
+theory E(87d MJ)=34.73 sits 1.30 BELOW poly 36.03; old poly
+overpriced that family ~3.7x in windows (v2b interpolation mixed
+d-families). (2) siege 'days' columns in t1a_v5 INVALID (610d
+window rates applied to an 87d count); E values stand; wall-clock
+re-price routes through the pricer patch over the full (m,D)
+belt. (3) tracked residual at 87d MJ: theory 0.8281 vs design-row
+0.8427 (-1.7% sigma = x1.8 windows) -- carried as explicit band.
