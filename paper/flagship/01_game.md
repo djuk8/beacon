@@ -26,3 +26,12 @@ Everything here is reproducible from a public repository and a
 data deposit (Section 9); every claim carries its provenance flag,
 and our failed hypotheses ship in Appendix A alongside the
 confirmed ones.
+
+This paper caps a measured program and travels with three
+companions: the construction paper [P0] (the crossover/2-adic
+swap -- the d-axis dial of Section 2, discovered and measured
+live), the fence-law paper [P1] (the squarefree singular series
+-- the microscopic rate e^gamma*omega(u) this law reduces to),
+and the pipeline paper [P2] (the engineering record and cost
+ledger, with receipts). The road itself -- what was built,
+measured, refuted, and kept -- is Section 4.

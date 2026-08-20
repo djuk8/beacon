@@ -2,7 +2,14 @@
 S. Troisi's combined_sieve (arXiv:2012.03771) out-sieves ours and
 is used as the field's reference; we cite it with gratitude, and
 our contribution is orthogonal -- pricing and design, not sieving
-speed. The prime-gap list project (T. Nicely's legacy; D.
+speed. Companion papers: [P0] develops the crossover/2-adic
+swap construction and its measured multiplier ladder; [P1]
+establishes the microscopic fence-rate law e^gamma*omega(u)
+(preregistered forward test at 6-7 sigma, the Buchstab cusp at
+8.45 sigma, a 94,885-fence out-of-sample check with zero fitted
+parameters); [P2] documents the pipeline and the realized cost
+ledger. This paper consumes all three and prices what they
+built. The prime-gap list project (T. Nicely's legacy; D.
 Jacobsen's stewardship) is the substrate of this entire paper.
 The /d construction is folklore among the record holders at the
 top of the tables; Gapcoin's proof-of-work network set the merit

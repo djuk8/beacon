@@ -1,5 +1,5 @@
 # Flagship build order (v0 complete; comment mode open)
-00 abstract | 01 game | 02 object | 03 law | 04 verification |
+00 abstract | 01 game | 02 object | 03 law | 04 road+checks |
 05 retrodiction | 06 hygiene (+06a PRIVATE, not-for-export) |
 07 conjecture | 08 pricing | 09 reproducibility | 10 credits |
 App A ledger | App B instruments | App C notation
