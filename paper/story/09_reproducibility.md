@@ -17,5 +17,5 @@ tested candidate carries a GEC-checked or PFGW verdict; finds are
 re-proved with an independent library before banking; the public
 notary re-proves endpoints and re-sieves the interior on
 independent hardware at submission. Nothing depends on trusting
-one program, one machine, or us. License: [SLOT -- decision
-pending].
+one program, one machine, or us. License: code under Apache-2.0; documents and
+data under CC BY 4.0 (LICENSE, LICENSE-DOCS, NOTICE).

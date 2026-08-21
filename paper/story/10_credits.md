@@ -2,7 +2,7 @@
 S. Troisi's combined_sieve (arXiv:2012.03771) out-sieves ours and
 is used as the field's reference; we cite it with gratitude, and
 our contribution is orthogonal -- pricing and design, not sieving
-speed. Companion papers: [P0] develops the crossover/2-adic
+speed. The strands folded into the single submission: [P0] develops the crossover/2-adic
 swap construction and its measured multiplier ladder; [P1]
 establishes the microscopic fence-rate law e^gamma*omega(u)
 (preregistered forward test at 6-7 sigma, the Buchstab cusp at

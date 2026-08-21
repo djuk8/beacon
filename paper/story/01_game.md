@@ -27,8 +27,9 @@ data deposit (Section 9); every claim carries its provenance flag,
 and our failed hypotheses ship in Appendix A alongside the
 confirmed ones.
 
-This paper caps a measured program and travels with three
-companions: the construction paper [P0] (the crossover/2-adic
+This paper caps a measured program and was initially drafted as three
+companion manuscripts, now folded into a single self-contained
+submission -- the strands: the construction paper [P0] (the crossover/2-adic
 swap -- the d-axis dial of Section 2, discovered and measured
 live), the fence-law paper [P1] (the squarefree singular series
 -- the microscopic rate e^gamma*omega(u) this law reduces to),

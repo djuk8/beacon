@@ -31,4 +31,9 @@ whitespace-anchored parser; sub-frontier "cheapest beats" list
 (retracted); two stale GPU burst constants (2165, 215.8); siege
 wall-days theater conflation; A[2,8] + c_walk retired as
 survivorship-biased; one-sided ring-1 chalkboard count; siege
-direction prediction (theory landed BELOW the retired curve).
+direction prediction (theory landed BELOW the retired curve). Siegel--Walfisz
+invocation in the 3.2 proof sketch unnecessary -- the class-
+torus mean is exact by CRT alone; prime-cofactor
+equidistribution never enters the mean (retired, C). Example-3.5
+'8.3% discount' claim REFUTED by gate G-D1 (C): smooth mass
+compensates; total d-ratio 1.0050 measured; d-dial closed.

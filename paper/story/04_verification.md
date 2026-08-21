@@ -1,6 +1,6 @@
 # 4. The road here, and the checks
 
-## 4.1 Three papers, one program
+## 4.1 Three strands, one paper
 [P0], the crossover/2-adic swap paper, is the CONSTRUCTION: it
 introduces the d-axis -- dividing the primorial to relocate
 small-prime kill classes -- measures the drop-2 parity gain and
