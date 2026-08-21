@@ -1,0 +1,762 @@
+
+==== [S0 freeze-teeth] 2026-08-21 08:10:45Z host=shredder ====
+ZERO ROWS -- freeze INTACT
+
+==== [S1 D1 paper patch (measurement PASS 0.9142/1.2904/1.0050)] 2026-08-21 08:10:45Z host=shredder ====
+Traceback (most recent call last):
+  File "<stdin>", line 28, in <module>
+AssertionError: 3.5 guard missing
+nothing added to commit but untracked files present (use "git add" to track)
+
+==== [S3 O2 recon: kit entrypoints + ladder config] 2026-08-21 08:10:45Z host=shredder ====
+total 15108
+drwxrwxr-x 2 djuk8 djuk8     4096 Aug 16 19:20 .
+drwxrwxr-x 3 djuk8 djuk8     4096 Aug 16 19:17 ..
+-rw-r--r-- 1 djuk8 djuk8     3578 Aug 16 19:17 fastmake.py
+-rwxrwxr-x 1 djuk8 djuk8 15412616 Aug 16 19:20 g1_fermat_v2
+-rw-rw-r-- 1 djuk8 djuk8      232 Aug 16 19:17 ladder610.json
+-rw-rw-r-- 1 djuk8 djuk8     5645 Aug 16 19:17 ladder610.py
+-rw-rw-r-- 1 djuk8 djuk8     1259 Aug 16 19:17 raid_loop.sh
+-rw-rw-r-- 1 djuk8 djuk8     6154 Aug 16 19:17 salvage_v0.py
+-rw-rw-r-- 1 djuk8 djuk8    16893 Aug 16 19:17 scanhunt_v0.py
+/home/djuk8/lab/deploy/kit_v1/fastmake.py:2:"""fastmake.py -- vectorized ring-survivor kernel for scanhunt make.
+/home/djuk8/lab/deploy/kit_v1/fastmake.py:8:deep-from-ring); the caller falls back to legacy otherwise.
+/home/djuk8/lab/deploy/kit_v1/fastmake.py:21:expect ~4-8x on the 610d ring-1 make (66 s -> ~8-18 s), more on later
+/home/djuk8/lab/deploy/kit_v1/fastmake.py:22:rings. The next lever beyond this is a Q amendment, not more numpy.
+/home/djuk8/lab/deploy/kit_v1/fastmake.py:71:    """Legacy-ordered survivor js per k for ring (lo, hi], whole block.
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:2:"""ladder610.py -- ring-ladder designer + mint gate for the 610d raid.
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:4:  python3 ladder610.py edges                # -> --rings string + design dE
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:9:window, and places ring edges at cumulative-E targets
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:14:every k's ring-1 survivor js, byte-compares the candidates in the .bin,
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:71:def cmd_edges():
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:89:    cum_e = counts / len(ks) * beta
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:92:        edges.append(int(np.searchsorted(cum_e, t)))
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:94:    de = [cum_e[e] for e in edges]
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:95:    print("--rings " + ",".join(str(e) for e in edges))
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:96:    print("design cum-E per ring: " +
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:98:    print(f"full-window E (sample) = {cum_e[half]:.2f} "
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:100:    json.dump(dict(edges=edges, cum_e=[float(x) for x in de],
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:105:def cmd_gate(name):
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:111:    assert edges == lad["edges"], "ring edges != certified ladder"
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:134:    want = lad["cum_e"][0]
+/home/djuk8/lab/deploy/kit_v1/ladder610.py:136:    print(f"ring-1 cum-E: minted {got:.3f} vs design {want:.3f} "
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:2:"""salvage_v0.py -- harvest realized gaps from ring-5 casualties.
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:11:Every k that reaches ring 5 has a certified prime-free core (campaign
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:12:rounds 1..r-1); the ring prime that killed it usually lands on ONE
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:25:import argparse, glob, json, math, os, time, sys
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:40:    ap = argparse.ArgumentParser()
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:41:    ap.add_argument("--span", type=int, default=200000)
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:42:    ap.add_argument("--floor", type=int, default=155000)
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:43:    ap.add_argument("--ring", type=int, default=5,
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:44:                    help="walk casualties of this ring (5=finalist shell, 4/3=crumb tiers)")
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:45:    ap.add_argument("--glob", default=None)
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:48:        a.glob = f"hunt_s*/sc_r{a.ring:02d}_*.manifest.json"
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:64:        except FileNotFoundError: pass
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:72:    except FileNotFoundError:
+/home/djuk8/lab/deploy/kit_v1/salvage_v0.py:75:    ledger = open("salvage_finds.log", "a", buffering=1)
+/home/djuk8/lab/deploy/kit_v1/scanhunt_v0.py:10:RING LADDER (GPU economics): candidates are tested center-out in rings.
+/home/djuk8/lab/deploy/kit_v1/scanhunt_v0.py:11:Any prime inside an inner ring kills every G-gap through the thin zone,
+/home/djuk8/lab/deploy/kit_v1/scanhunt_v0.py:12:so ks are ABANDONED at the first ring containing a prime; survivors of
+/home/djuk8/lab/deploy/kit_v1/scanhunt_v0.py:13:ring r advance to ring r+1 in the next round. Expected GPU tests per k
+/home/djuk8/lab/deploy/kit_v1/scanhunt_v0.py:14:~ ring-1 size + geometric tail ~ 300-400 at the default ladder.
+
+==== [S4 O3 recon: combined_sieve clone] 2026-08-21 08:10:45Z host=shredder ====
+Cloning into '/home/djuk8/lab/tools/prime-gap'...
+BENCHMARKS.md
+CMakeLists.txt
+EXTENDED.md
+LICENSE
+Makefile
+README.md
+THEORY.md
+cmake
+combined_sieve.cpp
+data
+gap_common.cpp
+gap_common.h
+gap_stats.cpp
+gap_test.py
+gap_test_common.cpp
+gap_test_common.h
+gap_test_gpu.cu
+gap_test_plotting.py
+gap_test_simple.cpp
+gap_test_stats.py
+gap_utils.py
+gap_utils_primes.py
+miller_rabin.h
+misc
+modulo_search.cpp
+modulo_search.h
+schema.sql
+# Combined Sieve - a new program to find prime gaps.
+
+A fast prime gap searching suite.
+
+# Table of Contents
+
+- [Overview](#overview)
+- [Combined Sieve - a new program to find prime gaps.](#combined-sieve---a-new-program-to-find-prime-gaps)
+  * [Tools](#tools)
+    + [Combined Sieve (Sieve many `m * p#/d`)](#combined-sieve-sieve-many-m--pd)
+      - [Method1 vs Method2 (Default)](#method1-vs-method2-default)
+    + [Gap Stats](#gap-stats)
+    + [Gap Test](#gap-test)
+    + [Benchmark](#benchmark)
+  * [Flow](#flow)
+    + [Database](#database)
+  * [Theory](#theory) | [THEORY.md](THEORY.md)
+  * [Setup](#setup)
+  * [Notes](#notes)
+    + [Quick test of all functions](#quick-test-of-all-functions)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
+## Overview
+
+This is a suite of tools (`combined_sieve`, `gap_stats`, `gap_test.py` and `gap_test_gpu`) which are useful for searching for prime gaps
+centered around `m * P#/d`.
+
+The flow is to sieve many intervals with `combined_sieve --save -u <filename>`
+
+Then calculate statistics about these intervals with `gap_stats --save -u <filename>`
+
+Then test some portion of these intervals with `gap_test.py -u <filename>.txt --prp-top-percent 25`
+
+To quickly test a known 30 merit prime gap ([Setup](#setup) must already be complete)
+
+```bash
+$ make
+$ sqlite3 test.db < schema.sql
+$ FN=809_1841070_11244000_1000_s15000_l200M.txt
+$ ./combined_sieve --save --search-db test.db -u $FN
+$ ./gap_stats --save --search-db test.db -u $FN --min-merit 20
+$ ./gap_test.py --search-db test.db -u $FN
+...
+23142  30.1485  11244911 * 809#/1841070 -5788 to +17354	RECORD!
+...
+```
+
+see [EXTENDED.md](for labourious notes and details)
+
+
+>> shredder stages complete. Remaining: on box1 run:
+>>   bash crown_gates.sh s2   then send gates_log.txt (both hosts)
+
+==== [S5 ladder + sieve-depth config probe] 2026-08-21 08:27:43Z host=shredder ====
+--- ladder610.json ---
+{"edges": [1568, 4374, 7244, 10198, 13500, 17734, 26542], "cum_e": [1.704705984051853, 3.4085352872170764, 5.401669282970168, 7.8042132527794275, 10.802023544610392, 15.000886651124329, 24.62815780765065], "G": 53082, "half": 26542}
+--- scanhunt sieve/ring defaults ---
+25:PE_q mod q -- the ABPE linear form with M=2. Primes (Q, deep_q] each land
+67:                Q=a.Q, deep_q=a.deep_q, G=G, edges=edges, seed=a.seed,
+84:    """Shallow (<=Q) + deep (Q, deep_q] residues for n0 = k * P_eff over a
+97:        self.dq = int(cfg["deep_q"])
+119:        """Even-j survivors of [jlo, jhi] (n0 odd), shallow+deep sieved.
+124:        W = jhi - jlo + 1
+166:                            f"SCAN DEEP CERT FAIL j={j} q={q}"
+202:    ud = r >= getattr(a, "deep_from_ring", 3)
+233:    assert free > need, (f"DISK GUARD: need {need/1e9:.2f} GB for {name}.bin, "
+234:                         f"only {free/1e9:.2f} GB free -- clear space first")
+250:    beta = math.exp(GAMMA) * math.log(cfg["deep_q"] or cfg["Q"]) / cfg["ln_n0"]
+380:    ap.add_argument("--deep-from-ring", type=int, default=3,
+381:                    help="apply the 1e9 deep sieve only from this ring on "
+382:                         "(early rings shallow: +~28%% GPU tests there, "
+--- raid_loop invocation flags ---
+5:ARGS="--zd 1439 --swap 2 3 5 7 11 --kdig 13 --merit 37.8241 --Q 100000 \
+6: --deep-q 0 --deep-from-ring 99 --rings $RINGS --bits 2048 --seed $S --kblock 20000"
+9:  python3 ../scanhunt_v0.py make --round 1 $ARGS || exit 1
+21:    [ $ok = 1 ] || { echo "DRIVE FAIL $BB -- block abandoned"; \
+23:    python3 ../scanhunt_v0.py fold --round $R --bin $BB $ARGS \
+24:      || { echo "FOLD FAIL $BB -- block abandoned"; break; }
+27:    [ $R -lt 7 ] && python3 ../scanhunt_v0.py make --round $((R+1)) $ARGS
+29:  python3 ../scanhunt_v0.py finish $ARGS >> finish.log 2>&1
+
+==== [S6 combined_sieve toolchain probe (O3 vehicle)] 2026-08-21 08:32:25Z host=shredder ====
+--- build ---
+g++ -c -o gap_test_common.o gap_test_common.cpp -Wall -Werror -O3 
+In file included from gap_common.cpp:15:
+gap_common.h:27:10: fatal error: gmp.h: No such file or directory
+   27 | #include <gmp.h>
+      |          ^~~~~~~
+compilation terminated.
+make: *** [Makefile:37: gap_common.o] Error 1
+make: *** Waiting for unfinished jobs....
+In file included from gap_test_common.h:23,
+                 from gap_test_common.cpp:15:
+gap_common.h:27:10: fatal error: gmp.h: No such file or directory
+   27 | #include <gmp.h>
+      |          ^~~~~~~
+compilation terminated.
+make: *** [Makefile:37: gap_test_common.o] Error 1
+--- binaries ---
+--- combined_sieve --help (head) ---
+crown_gates.sh: line 117: ./combined_sieve: No such file or directory
+--- gap_stats --help (head) ---
+crown_gates.sh: line 119: ./gap_stats: No such file or directory
+STAGE s6 FAILED (not marked)
+
+>> shredder stages complete. Remaining: on box1 run:
+>>   bash crown_gates.sh s2   then send gates_log.txt (both hosts)
+
+==== [S6 combined_sieve toolchain probe (O3 vehicle)] 2026-08-21 08:35:03Z host=shredder ====
+--- build ---
+g++ -c -o gap_common.o gap_common.cpp -Wall -Werror -O3 
+g++ -c -o gap_test_common.o gap_test_common.cpp -Wall -Werror -O3 
+g++ -o benchmark misc/benchmark.cpp modulo_search.o -Wall -Werror -O3 -lprimesieve -lgmp -lsqlite3 -fopenmp -L /usr/local/lib -I.
+g++ -o benchmark_google misc/benchmark_google.cpp modulo_search.o -Wall -Werror -O3 -std=c++14 -lprimesieve -lbenchmark -lpthread -I.
+misc/benchmark_google.cpp:21:10: fatal error: benchmark/benchmark.h: No such file or directory
+   21 | #include <benchmark/benchmark.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make: *** [Makefile:68: benchmark_google] Error 1
+make: *** Waiting for unfinished jobs....
+--- binaries ---
+--- combined_sieve --help (head) ---
+crown_gates.sh: line 117: ./combined_sieve: No such file or directory
+--- gap_stats --help (head) ---
+crown_gates.sh: line 119: ./gap_stats: No such file or directory
+STAGE s6 FAILED
+
+==== [S6 combined_sieve toolchain probe (O3 vehicle)] 2026-08-21 08:36:34Z host=shredder ====
+--- build ---
+g++ -o combined_sieve combined_sieve.cpp gap_common.o modulo_search.o gap_test_common.o -Wall -Werror -O3 -lprimesieve -lgmp -lsqlite3 -fopenmp -L /usr/local/lib 
+g++ -o gap_stats gap_stats.cpp gap_common.o -Wall -Werror -O3 -lgmp -lsqlite3 -fopenmp -L /usr/local/lib
+g++ -o gap_test_simple gap_test_simple.cpp gap_common.o gap_test_common.o -Wall -Werror -O3 -lgmp -lsqlite3 -fopenmp -L /usr/local/lib
+g++ -o benchmark_google misc/benchmark_google.cpp modulo_search.o -Wall -Werror -O3 -std=c++14 -lprimesieve -lbenchmark -lpthread -I.
+misc/benchmark_google.cpp:21:10: fatal error: benchmark/benchmark.h: No such file or directory
+   21 | #include <benchmark/benchmark.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make: *** [Makefile:68: benchmark_google] Error 1
+make: *** Waiting for unfinished jobs....
+--- binaries ---
+-rwxrwxr-x 1 djuk8 djuk8 209880 Aug 21 08:36 combined_sieve
+-rwxrwxr-x 1 djuk8 djuk8 179800 Aug 21 08:36 gap_stats
+--- combined_sieve --help (head) ---
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  -t, --threads N
+    Use N threads (OpenMP)
+  --min-merit <min_merit>
+    only display prime gaps with merit >= min_merit
+  --sieve-length
+    how large the positive/negative sieve arrays should be
+  --max-prime
+    use primes <= max-prime (in millions) for checking composite
+
+  --save-unknowns
+    save unknowns to a temp file where they are processed in a 2nd pass.
+  --rle
+    save in run-length encoded format
+  --bitcompress
+    save in new bitcompressed format
+  --maxmem <max memory in GB>
+    Combined sieve will print a warning if it's likely to use more memory.
+
+[OPTIONAL]
+  --search-db
+    Database for this project (Default: 'prime-gap-search.db')
+  --prime-gaps-db
+    Prime gap prime gap search db (Default: 'gaps.db')
+
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+--- gap_stats --help (head) ---
+Usage: ./gap_stats
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  -t, --threads N
+    Use N threads (OpenMP)
+  --min-merit <min_merit>
+    only display prime gaps with merit >= min_merit
+
+[OPTIONAL]
+  --search-db
+    Database for this project (Default: 'prime-gap-search.db')
+  --prime-gaps-db
+
+==== [S6 combined_sieve toolchain probe (O3 vehicle)] 2026-08-21 08:36:55Z host=shredder ====
+--- build ---
+g++ -o benchmark_google misc/benchmark_google.cpp modulo_search.o -Wall -Werror -O3 -std=c++14 -lprimesieve -lbenchmark -lpthread -I.
+misc/benchmark_google.cpp:21:10: fatal error: benchmark/benchmark.h: No such file or directory
+   21 | #include <benchmark/benchmark.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make: *** [Makefile:68: benchmark_google] Error 1
+--- binaries ---
+-rwxrwxr-x 1 djuk8 djuk8 209880 Aug 21 08:36 combined_sieve
+-rwxrwxr-x 1 djuk8 djuk8 179800 Aug 21 08:36 gap_stats
+--- combined_sieve --help (head) ---
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  -t, --threads N
+    Use N threads (OpenMP)
+  --min-merit <min_merit>
+    only display prime gaps with merit >= min_merit
+  --sieve-length
+    how large the positive/negative sieve arrays should be
+  --max-prime
+    use primes <= max-prime (in millions) for checking composite
+
+  --save-unknowns
+    save unknowns to a temp file where they are processed in a 2nd pass.
+  --rle
+    save in run-length encoded format
+  --bitcompress
+    save in new bitcompressed format
+  --maxmem <max memory in GB>
+    Combined sieve will print a warning if it's likely to use more memory.
+
+[OPTIONAL]
+  --search-db
+    Database for this project (Default: 'prime-gap-search.db')
+  --prime-gaps-db
+    Prime gap prime gap search db (Default: 'gaps.db')
+
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+--- gap_stats --help (head) ---
+Usage: ./gap_stats
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  -t, --threads N
+    Use N threads (OpenMP)
+  --min-merit <min_merit>
+    only display prime gaps with merit >= min_merit
+
+[OPTIONAL]
+  --search-db
+    Database for this project (Default: 'prime-gap-search.db')
+  --prime-gaps-db
+
+==== [S7 O3 depth benchmark (combined_sieve @ raid config)] 2026-08-21 08:39:09Z host=shredder ====
+--- depth max-prime=100M  (Q=100e6) ---
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+	Command being timed: "./combined_sieve -p 1439 -d 2310 --mstart 10000000000000 --minc 1000 --sieve-length 26542 --max-prime 100 -t 32 --save-unknowns"
+	User time (seconds): 0.00
+	System time (seconds): 0.00
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.00
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 4608
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 194
+	Voluntary context switches: 1
+	Involuntary context switches: 0
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 1
+--- depth max-prime=1000M  (Q=1000e6) ---
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+	Command being timed: "./combined_sieve -p 1439 -d 2310 --mstart 10000000000000 --minc 1000 --sieve-length 26542 --max-prime 1000 -t 32 --save-unknowns"
+	User time (seconds): 0.00
+	System time (seconds): 0.00
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.00
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 4608
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 193
+	Voluntary context switches: 1
+	Involuntary context switches: 0
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 1
+canary: expect avg unknowns ~1054/window @100M, ~937/window @1000M
+threshold: <=4.3 core-ms/window @1000M sustains the 4x5090 fleet
+
+==== [S7 O3 depth benchmark v2 (db bootstrap + control + trisection)] 2026-08-21 08:40:59Z host=shredder ====
+db ready: o3.db
+--- control ---
+[exit=1]  first lines:
+invalid number of threads(32) only 1 - 16 supported
+
+	Compiled with GMP 6.3.0
+
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+  ... last lines:
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+wall=0.00s cpu=0.00s rss=4608KB
+CONTROL FAILED -- toolchain issue, stop
+STAGE s7 FAILED
+
+==== [S7 O3 depth benchmark v2 (db bootstrap + control + trisection)] 2026-08-21 08:42:13Z host=shredder ====
+db ready: o3.db
+--- control ---
+[exit=134]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 809#/1841070, m = 11244000 + [0, 50)
+Running with 16 threads
+K = 1084 bits, 327 digits, log(K) = 751.36
+
+	expect 639 left = 2 * 320 (2.131%) of 15000 after 100M
+	0.130% of 327 digit numbers are prime
+	4.269% of tests should be prime (32.8x speedup)
+	~2x23.4 = 46.9 PRP tests per m
+	sieve_length=15000 is insufficient ~~0.000% of time
+
+sieve_length:  2x 15000
+  ... last lines:
+
+10000000   (primes 316066/664580)	(seconds: 0.00/0.8 | per m: 0.0689)
+	factors           19857 	(interval: 873 avg m/large_prime interval: 0.2)
+	~ 2x 26.77 PRP/m		(~ 26.5 skipped PRP => 677.1 PRP/thread-seconds)
+
+20000000   (combined_sieve: combined_sieve.cpp:1273: void save_unknowns_method2(const Config&, const __mpz_struct (&)[1], const Cached&, const std::vector<bool>*): Assertion `unknown_file.is_open()' failed.
+Command terminated by signal 6
+wall=6.96s cpu=5.76s rss=8704KB
+CONTROL FAILED -- toolchain issue, stop
+STAGE s7 FAILED
+
+==== [S7 O3 depth benchmark v3 (filename-driven, per README flow)] 2026-08-21 08:43:58Z host=shredder ====
+db ready: o3.db (fresh)
+--- control  (809_1841070_11244000_50_s15000_l100M.txt) ---
+[exit=134]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 809#/1841070, m = 11244000 + [0, 50)
+Running with 16 threads
+K = 1084 bits, 327 digits, log(K) = 751.36
+
+	expect 639 left = 2 * 320 (2.131%) of 15000 after 100M
+	0.130% of 327 digit numbers are prime
+	4.269% of tests should be prime (32.8x speedup)
+	~2x23.4 = 46.9 PRP tests per m
+	sieve_length=15000 is insufficient ~~0.000% of time
+
+sieve_length:  2x 15000
+max_prime:        100000000
+small_threshold:  47827
+  ... last lines:
+	factors           18984 	(interval: 249 avg m/large_prime interval: 0.3)
+	~ 2x 27.98 PRP/m		(~  9.0 skipped PRP => 1151.0 PRP/thread-seconds)
+
+10000000   (primes 316066/664580)	(seconds: 0.00/0.8 | per m: 0.0688)
+	factors           19857 	(interval: 873 avg m/large_prime interval: 0.2)
+	~ 2x 26.77 PRP/m		(~ 26.5 skipped PRP => 719.1 PRP/thread-seconds)
+
+20000000   (pcombined_sieve: combined_sieve.cpp:1273: void save_unknowns_method2(const Config&, const __mpz_struct (&)[1], const Cached&, const std::vector<bool>*): Assertion `unknown_file.is_open()' failed.
+Command terminated by signal 6
+wall=6.96s cpu=5.76s rss=8704KB
+CONTROL FAILED -- stop
+STAGE s7 FAILED
+
+==== [S7 O3 depth benchmark v3 (filename-driven, per README flow)] 2026-08-21 08:45:25Z host=shredder ====
+db ready: o3.db (fresh); unknowns/ present
+--- control  (809_1841070_11244000_50_s15000_l100M.txt) ---
+[exit=0]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 809#/1841070, m = 11244000 + [0, 50)
+Running with 16 threads
+K = 1084 bits, 327 digits, log(K) = 751.36
+
+	expect 639 left = 2 * 320 (2.131%) of 15000 after 100M
+	0.130% of 327 digit numbers are prime
+	4.269% of tests should be prime (32.8x speedup)
+	~2x23.4 = 46.9 PRP tests per m
+	sieve_length=15000 is insufficient ~~0.000% of time
+
+sieve_length:  2x 15000
+max_prime:        100000000
+small_threshold:  47827
+  ... last lines:
+	Estimated 24.9 new composites found 1.84e+19 (74094408542057398272.00% error)
+	~ 2x 23.43 PRP/m		(~ 20.2 skipped PRP => 77.0 PRP/thread-seconds)
+
+	method2_large_primes done
+
+Saving unknowns to 'unknowns/809_1841070_11244000_50_s15000_l100M.txt'
+	saving 5150/84176 (6.1%) from sieve
+Saving unknowns took 0.0 seconds
+combined sieve Done!
+wall=5.88s cpu=5.83s rss=9728KB
+--- raid_ms10000000000000_mp100  (1439_2310_10000000000000_100_s26542_l100M.txt) ---
+[exit=1]  first lines:
+mstart + minc must be <= 10e9
+SL=26542 not coprime (p=23)
+SL=26542 not coprime (p=577)
+
+	Compiled with GMP 6.3.0
+
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+  ... last lines:
+    Prime gap prime gap search db (Default: 'gaps.db')
+
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+wall=0.00s cpu=0.00s rss=4608KB
+--- raid_ms4000000000_mp100  (1439_2310_4000000000_100_s26542_l100M.txt) ---
+[exit=1]  first lines:
+SL=26542 not coprime (p=23)
+SL=26542 not coprime (p=577)
+
+	Compiled with GMP 6.3.0
+
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  ... last lines:
+    Prime gap prime gap search db (Default: 'gaps.db')
+
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+wall=0.00s cpu=0.00s rss=4608KB
+--- raid_ms1000000000_mp100  (1439_2310_1000000000_100_s26542_l100M.txt) ---
+[exit=1]  first lines:
+SL=26542 not coprime (p=23)
+SL=26542 not coprime (p=577)
+
+	Compiled with GMP 6.3.0
+
+Usage: ./combined_sieve
+[REQUIRED]
+  -p <p>
+  -d <p>
+  --mstart <start>
+  --minc   <int>
+OR
+  -u, --unknown-filename <filename>
+    parse p, d, mstart, minc, sieve-length, max-prime from filename
+
+[OPTIONALLY]
+  ... last lines:
+    Prime gap prime gap search db (Default: 'gaps.db')
+
+  -q, --quiet
+    suppress some status output (twice for more suppression)
+  -h, --help
+    print this help message
+
+calculates prime_gaps for (mstart + mi) * p#/d, mi <= minc 
+Command exited with non-zero status 1
+wall=0.00s cpu=0.00s rss=4608KB
+ALL mstart tiers rejected -- paste log; fork-patch likely
+STAGE s7 FAILED
+
+==== [S7 O3 depth benchmark v3 (filename-driven, per README flow)] 2026-08-21 08:50:44Z host=shredder ====
+db ready: o3.db (fresh); unknowns/ present
+--- control  (809_1841070_11244000_50_s15000_l100M.txt) ---
+[exit=0]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 809#/1841070, m = 11244000 + [0, 50)
+Running with 16 threads
+K = 1084 bits, 327 digits, log(K) = 751.36
+
+	expect 639 left = 2 * 320 (2.131%) of 15000 after 100M
+	0.130% of 327 digit numbers are prime
+	4.269% of tests should be prime (32.8x speedup)
+	~2x23.4 = 46.9 PRP tests per m
+	sieve_length=15000 is insufficient ~~0.000% of time
+
+sieve_length:  2x 15000
+max_prime:        100000000
+small_threshold:  47827
+  ... last lines:
+	Estimated 24.9 new composites found 1.84e+19 (74094408542057398272.00% error)
+	~ 2x 23.43 PRP/m		(~ 20.2 skipped PRP => 79.1 PRP/thread-seconds)
+
+	method2_large_primes done
+
+Saving unknowns to 'unknowns/809_1841070_11244000_50_s15000_l100M.txt'
+	saving 5117/84176 (6.1%) from sieve
+Saving unknowns took 0.0 seconds
+combined sieve Done!
+wall=5.88s cpu=5.80s rss=9728KB
+--- raid_ms9999999900_mp100  (1439_2310_9999999900_100_s26620_l100M.txt) ---
+[exit=0]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 1439#/2310, m = 9999999900 + [0, 100)
+Running with 16 threads
+K = 1983 bits, 597 digits, log(K) = 1374.15
+
+	expect 1060 left = 2 * 530 (1.991%) of 26620 after 100M
+	0.072% of 597 digit numbers are prime
+	2.347% of tests should be prime (32.8x speedup)
+	~2x42.6 = 85.2 PRP tests per m
+	sieve_length=26620 is insufficient ~~0.000% of time
+
+sieve_length:  2x 26620
+max_prime:        100000000
+small_threshold:  84300
+  ... last lines:
+	~ 2x 42.62 PRP/m		(~ 66.7 skipped PRP => 230.1 PRP/thread-seconds)
+
+	method2_large_primes done
+Estimated modulo searches (m/prime) error 0.10%,	2579219 vs expected 2581870
+
+Saving unknowns to 'unknowns/1439_2310_9999999900_100_s26620_l100M.txt'
+	saving 17019/269760 (6.3%) from sieve
+Saving unknowns took 0.0 seconds
+combined sieve Done!
+wall=5.90s cpu=5.95s rss=11776KB
+ACCEPTED mstart=9999999900 -> depth run
+--- raid_ms9999999900_mp1000  (1439_2310_9999999900_100_s26620_l1000M.txt) ---
+[exit=0]  first lines:
+	Compiled with GMP 6.3.0
+
+
+Testing m * 1439#/2310, m = 9999999900 + [0, 100)
+Running with 16 threads
+K = 1983 bits, 597 digits, log(K) = 1374.15
+
+	expect 942 left = 2 * 471 (1.770%) of 26620 after 1000M
+	0.072% of 597 digit numbers are prime
+	2.640% of tests should be prime (36.9x speedup)
+	~2x37.9 = 75.8 PRP tests per m
+	sieve_length=26620 is insufficient ~~0.000% of time
+
+sieve_length:  2x 26620
+max_prime:        1000000000
+small_threshold:  84300
+  ... last lines:
+	~ 2x 37.88 PRP/m		(~  7.7 skipped PRP => 14.6 PRP/thread-seconds)
+
+	method2_large_primes done
+Estimated modulo searches (m/prime) error 0.11%,	3205566 vs expected 3208947
+
+Saving unknowns to 'unknowns/1439_2310_9999999900_100_s26620_l1000M.txt'
+	saving 15073/269760 (5.6%) from sieve
+Saving unknowns took 0.0 seconds
+combined sieve Done!
+wall=6.18s cpu=10.50s rss=12800KB
+canary: expect avg unknowns ~1057/window @100M, ~940 @1000M
+threshold: <=4.3 core-ms/window @1000M feeds the 4x5090 box
+
+==== [S8 O3 marginal cost (minc slope @ 1000M) + window counts] 2026-08-21 08:55:00Z host=shredder ====
+Saving unknowns to 'unknowns/1439_2310_9999990000_100_s26620_l1000M.txt'
+	saving 18502/328770 (5.6%) from sieve
+Saving unknowns took 0.0 seconds
+MINC=100 wall=6.18s cpu=10.45s
+windows: 21 (1439_2310_9999990000_100_s26620_l1000M.txt)
+Saving unknowns to 'unknowns/1439_2310_9999990000_2100_s26620_l1000M.txt'
+	saving 401911/7190790 (5.6%) from sieve
+Saving unknowns took 0.0 seconds
+MINC=2100 wall=6.34s cpu=12.76s
+windows: 437 (1439_2310_9999990000_2100_s26620_l1000M.txt)
+--- v1.11 file window counts (retro-confirm N) ---
+    20 unknowns/1439_2310_9999999900_100_s26620_l100M.txt
+    20 unknowns/1439_2310_9999999900_100_s26620_l1000M.txt
+    40 total
+marginal core-ms/window = (cpu2100-cpu100)/(win2100-win100)*1000
+P-S8a: PASS if <= 2.0 (threshold 4.3)
+
+==== [S9 true unknowns/window from files (settles retracted S7 leg)] 2026-08-21 09:01:13Z host=shredder ====
+1439_2310_9999990000_100_s26620_l1000M.txt: N=21  avg=948.1  sd=33.3  min=885 max=1022
+1439_2310_9999990000_2100_s26620_l1000M.txt: N=437  avg=942.6  sd=24.5  min=859 max=1022
+1439_2310_9999999900_100_s26620_l1000M.txt: N=20  avg=945.2  sd=24.3  min=908 max=1015
+1439_2310_9999999900_100_s26620_l100M.txt: N=20  avg=1065.9  sd=24.6  min=1020 max=1135
+P-S9a: 1000M files avg 940 +/- 3% and mutually consistent;
+       100M file avg 1057 +/- 3%

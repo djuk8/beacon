@@ -71,3 +71,20 @@ rejected at more than $8\sigma$. Within the present framework
 these measurements are confirmations of the deep limit of
 Theorem 3.3, and the cusp is the opening of the two-prime
 channels at the boundary of Proposition 3.1.
+
+## 5.6 Cross-validation against the community reference sieve
+As an adversarial check, the counting expression was run against
+the combined sieve of Troisi [troisi2020] -- an independent
+codebase and a different sieving algorithm -- at a production
+configuration ($z = 1439$, $d = 2310$, window $\pm 26{,}620$,
+depths $Q = 10^8$ and $10^9$). Three-way agreement: the tool's
+internal estimator predicted $1060$ and $942$ survivors per
+window at the two depths; the present law, with no adjustable
+quantity, gives $1057$ and $940$; the sieved counts average
+$1065.9$ ($N = 20$) and $942.6$ ($N = 437$). All pairwise
+deviations are below $0.9\%$, and the matched-configuration
+depth ratio $0.887$ agrees with the Mertens prediction $0.889$
+to $0.25\%$. The window-to-window variance is sub-Poisson
+($\mathrm{Var}/\mathrm{mean} = 0.64$ at $N = 437$), consistent
+in sign with the negative deep-prime pair correlations of
+Remark 3.2.1.

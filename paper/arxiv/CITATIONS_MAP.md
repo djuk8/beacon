@@ -28,3 +28,5 @@ Sec 4.2 / Ack  notary, reference sieve -> troisi2020
 Ack / Sec 1  record list: Nicely tables, post-2019 curation on
   GitHub -> nicely1999, primegaplist ......... WEB-VERIFIED
 Pintz very large gaps (context) -> pintz1997 ... WEB-VERIFIED
+Sec 5.6  combined_sieve cross-validation (three-way counts,
+  depth ratio, sub-Poisson variance) -> troisi2020 . MEASURED
