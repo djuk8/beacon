@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""scanhunt_v0.py -- the resonance record campaign engine.
+"""scanhunt_v0.py v0.1 (2026-08-21, C): stable center-out argsort; --fast 2 = C sieve+pack via fastmake_c (byte-identical, gated).
+scanhunt_v0.py -- the resonance record campaign engine.
 
 Construction (frontier-law, measured 2026-08-02): n0 = k * zd# / d with
 zd ~ 1.01 x ln n0, small-swap d, k a sequential odd scan. A k SUCCEEDS if
@@ -213,13 +214,18 @@ def cmd_make(a):
                                     sv.prs, sv.PEm, lo, hi)
         except Exception as _e:
             print(f"fastmake unavailable ({_e}) -- legacy path")
-    for i, k in enumerate(ks):
+    packed = None
+    if fjs is not None and getattr(a, "fast", 1) >= 2 and getattr(fastmake, "IMPL", "") == "c":
+        # v0.1 C path: sieve + center-out stable order + packing in fastmake_c; byte-identical to the loop below
+        pjs, psizes, packed = fastmake.block_pack(np.array(ks, dtype=np.int64), sv.prs, sv.PEm, lo, hi, int(P_eff), nb)
+        sizes = list(psizes); blobs = [(k, j.tolist(), None) for k, j in zip(ks, pjs)]
+    for i, k in enumerate(ks if packed is None else []):
         n0 = k * P_eff
         js = fjs[i] if fjs is not None else np.concatenate([
             sv.survivors(k, -hi, -lo - 1, n0=n0, use_deep=ud) if lo else
             sv.survivors(k, -hi, -1, n0=n0, use_deep=ud),
             sv.survivors(k, lo + 1 if lo else 1, hi, n0=n0, use_deep=ud)])
-        order = np.argsort(np.abs(js))          # center-out inside the ring
+        order = np.argsort(np.abs(js), kind="stable")   # center-out; STABLE: -j before +j on ties (v0.1, matches the C packer)
         js = js[order]
         cands = [int(n0 + int(j)) for j in js]
         sizes.append(len(cands)); blobs.append((k, js.tolist(), cands))
@@ -234,14 +240,19 @@ def cmd_make(a):
                          f"only {free/1e9:.2f} GB free -- clear space first")
     with open(f"{name}.bin", "wb") as f:
         f.write(struct.pack("<IIQ", MAGIC_C, cfg["bits"], total))
-        for _, _, cands in blobs:
-            for c in cands:
-                f.write(c.to_bytes(nb, "little"))
+        if packed is not None:
+            f.write(packed)
+        else:
+            for _, _, cands in blobs:
+                for c in cands:
+                    f.write(c.to_bytes(nb, "little"))
+    first = blobs[0][2][0] if packed is None else int(blobs[0][0] * P_eff + blobs[0][1][0])
+    last = blobs[-1][2][-1] if packed is None else int(blobs[-1][0] * P_eff + blobs[-1][1][-1])
     with open(f"{name}.bin", "rb") as f:
         f.seek(16); c0 = int.from_bytes(f.read(nb), "little")
         f.seek(16 + (total - 1) * nb); cL = f.read(nb)
-        assert len(cL) == nb and c0 == blobs[0][2][0] \
-            and int.from_bytes(cL, "little") == blobs[-1][2][-1], \
+        assert len(cL) == nb and c0 == first \
+            and int.from_bytes(cL, "little") == last, \
             f"{name}.bin TRUNCATED/CORRUPT on write -- do not drive it"
     json.dump(dict(cfg=cfg, round=r, bid=bid,
                    ks=[b[0] for b in blobs],
@@ -383,7 +394,7 @@ def main():
                          "~60x cheaper make)")
     ap.add_argument("--kblock", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--fast", type=int, default=1)
+    ap.add_argument("--fast", type=int, default=2, help="0 legacy, 1 numpy kernel, 2 C kernel+pack (falls back if fastmake_c.so absent)")
     ap.add_argument("--max-prp", type=int, default=60000)
     a = ap.parse_args()
     dict(make=cmd_make, fold=cmd_fold, finish=cmd_finish,
