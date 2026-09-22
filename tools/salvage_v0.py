@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""salvage_v0.py -- harvest realized gaps from ring-5 casualties.
+"""salvage_v0.py v0.3 (2026-08-24) -- per-manifest cfg/core (mixed venues safe); NEVER moves a manifest it
+did not walk or fully account for; empty-ks and foreign-venue fossils stay in place, loudly.
+v0.3.1: archive names keep the hunt-dir prefix (basename collisions across dirs were silently
+overwriting archived fossils); ledger lines carry a UTC timestamp as column 6 (loader ignores extras).
+v0.2 -- harvest realized gaps from ring-N casualties.
 v0.2 LIVE-LEDGER: finds are appended to salvage_finds.log IMMEDIATELY
 (flushed + fsynced) after each walk, not at end-of-run -- a killed or
 restarted sweep can no longer lose ledger entries and re-walk old ks.
@@ -75,22 +79,29 @@ def run(a, mans):
     ledger = open("salvage_finds.log", "a", buffering=1)
     cfg = json.load(open(mans[0]))["cfg"]
     zd, d = cfg["zd"], cfg["d"]
-    rnd = json.load(open(mans[0]))["round"]
-    core = cfg["edges"][rnd - 2] if rnd >= 2 else 0
-    print(f"salvage: {len(mans)} manifests, config zd={zd} d={d} "
-          f"core +/-{core}, span +/-{a.span}")
+    print(f"salvage v0.3: {len(mans)} manifests, zd={zd} d={d} "
+          f"span +/-{a.span} (core read PER MANIFEST -- venues may coexist)")
     prs = primes_upto(10**6)
     P = gmpy2.mpz(1); p = gmpy2.mpz(2)
     while p <= zd: P *= p; p = gmpy2.next_prime(p)
     P_eff = P//d
     PEm = np.array([int(P_eff % int(q)) for q in prs], dtype=np.int64)
     out = []
+    n_walked = n_skipped = n_empty = 0
     for mf in mans:
         man = json.load(open(mf))
+        mc = man["cfg"]; rnd = int(man["round"])
+        core = mc["edges"][rnd - 2] if rnd >= 2 else 0
+        if mc["zd"] != zd or mc["d"] != d:
+            print(f"{mf}: SKIP (different venue zd={mc['zd']} d={mc['d']}) -- left in place"); n_skipped += 1; continue
+        if not man["ks"]:
+            print(f"{mf}: EMPTY ks list -- left in place for inspection"); n_empty += 1; continue
         pending = [int(k) for k in man["ks"] if int(k) not in done]
         if not pending:
-            os.rename(mf, "salvaged/" + os.path.basename(mf))
+            # every k already ledgered: this alone justifies archiving
+            os.rename(mf, "salvaged/" + mf.replace("/", "__")); n_skipped += 1
             continue
+        n_walked += 1
         unresolved = False
         for k in pending:
             done.add(k)
@@ -129,7 +140,7 @@ def run(a, mans):
             line = (f"k={k}: GAP {gap:,} merit {merit:.4f} "
                     f"(jl {jl} jr {jr}) [{time.time()-t0:.0f}s]")
             print(line); out.append((gap, merit, k, jl, jr))
-            ledger.write(f"{gap} {merit:.4f} {k} {jl} {jr}\n")
+            ledger.write(f"{gap} {merit:.4f} {k} {jl} {jr} {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n")
             ledger.flush(); os.fsync(ledger.fileno())
             if gap >= a.floor:
                 with open(f"find_salvage_D2702_g{gap}.txt", "w") as f:
@@ -139,9 +150,10 @@ def run(a, mans):
         if unresolved:
             print(f"{mf}: KEPT in place (span-exceeder pending wider sweep)")
         else:
-            os.rename(mf, "salvaged/" + os.path.basename(mf))
+            os.rename(mf, "salvaged/" + mf.replace("/", "__"))
     ledger.close()
     out.sort(reverse=True)
+    print(f"walked {n_walked} manifests; already-ledgered {n_skipped}; empty {n_empty}")
     print(f"\n{len(out)} salvaged; largest: "
           + (f"{out[0][0]:,} @ {out[0][1]:.4f}" if out else "none"))
 

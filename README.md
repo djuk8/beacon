@@ -159,6 +159,19 @@ design  ->  make  ->  drive  ->  fold  ->  ... (rings 2..R) ...  ->  finish
   independent hardware at submission. Nothing depends on trusting a
   single program.
 
+- **September machinery (RC11/RC12).** A persistent **bucket sieve**
+  (`tools/sieve/`, FK lattice walk, one 24-byte record per prime) and
+  its GPU port (`cuda/gbs.cu`) sieve every window to 10¹⁰ — one card
+  sieves for the whole box (`theater/raid610/gbsd.py`, the *sieve
+  card*), byte-identical to the CPU reference (gates G-BSD, G-GBS,
+  G-SV incl. stop-and-resume). A **full-window sparsity predictor**
+  (residue tables for primes to 10⁵) ranks the pool before testing:
+  ×1.42 crown-λ per tested window (gate G-PRED). A **ladder manager**
+  (`ladder.py`, one process per card) replaced 700 shell loops,
+  replay-gated identical (G-LADDER). Feeders and drivers pinned to
+  reserved cores. `daily.sh` is the one-screen production read;
+  `harvest_hourly.sh` walks every fossil and keeps the campaign ledger.
+
 ## 5. Campaigns and results
 
 Three "theaters" ran this architecture at three heights (details,
@@ -166,16 +179,23 @@ configs, and preregistrations in `docs/` and `theater/`):
 
 | theater | height | target board | outcome |
 |---|---|---|---|
-| raid610 | ~610 digits | all-time merit table | top-20 entry banked (merit 37.69); table under active fire |
-| strike24k | ~6,152 digits | largest gap @ merit ≥ 30 | **crown**: 426,520 @ 30.1156 |
-| mono | ~26,599 digits | largest gap @ merit ≥ 20 | **two top-10 seats**: 1,348,726 @ 22.02 and 1,263,196 @ 20.62 |
+| raid610 | ~611 digits | all-time merit table | **the record: 59,724 @ merit 42.5192** (previous record 41.9388, 2017); **#2: 58,416 @ 41.5882**; 20 certified first-occurrence records in the list, ~25,000 further claims in the ledger |
+| strike24k | ~6,152 digits | largest gap @ merit ≥ 30 | **crown**: 426,520 @ 30.1156 (+11 size records at merit 25–30) |
+| mono | ~26,599 digits | largest gap @ merit ≥ 20 | **1,383,648 @ 22.59**, 1,348,726 @ 22.02, 1,263,196 @ 20.62 |
 
 Plus the ≥2,500-digit merit crown (209,420 @ 33.638) and its guard
-from the earlier 2,704-digit campaign, and several dozen banked
-first-occurrence claims. Every find above was **priced before it was
-hunted**, and the realized costs sit inside the predicted bands — the
-cost ledger (hardware, hours, dollars) is part of the release, because
-"10–100× cheaper than blind search" is a claim that deserves receipts.
+(201,646 @ 32.385) from the 2,704-digit campaign. The record and its
+runner-up came out of the **salvage walk** over near-miss windows —
+asymmetric gaps that a symmetric ring ladder discards — a channel the
+cost law had not priced; the paper does. All entries were submitted
+under `mvojvoda` on 2026-09-22 and re-verified by the list's own
+server; endpoints of the certified batch are ECPP-proven (`records/`).
+Every find above was **priced before it was hunted**, and the realized
+costs sit inside the predicted bands — the cost ledger (hardware,
+hours, dollars) is part of the release.
+
+Throughput of record (September 2026, one 4×RTX 5090 box): 44–45k
+windows/s sustained, ~64k crown-effective, with the CPU nearly idle.
 
 ## 6. Reproducibility
 
@@ -208,7 +228,11 @@ exchange/   the pricing instruments: pricer_v1 (cost law -> GPU-days),
             merit_price_v0 (bridge-exact certifier), fit_sigma_v1
             (the unified-law fit), audit + resonance tools
 theater/    per-campaign configs and loops (raid610, mono, strike24k)
-cuda/       GPU kernel sources (g1_fermat family) + gate harness
+cuda/       GPU kernel sources (g1_fermat family, gbs.cu GPU sieve) + gate harness
+tools/sieve/ the persistent bucket sieve (C): bsieve.c, bs_api.c, fk_walk.c + referees
+records/    what is on the Prime Gap List: submission lines, the treasury by venue,
+            record endpoints, verification chain (certificates ship with the data archive)
+deploy/kit_v8/ the September kit as deployed (o1_kit v8.51)
 docs/       mission, preregistrations, cost calculus, novelty sweep,
             retrodictions, session handoffs
 history/    frozen snapshots of earlier eras (arch2704 construction

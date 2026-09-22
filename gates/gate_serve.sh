@@ -16,7 +16,7 @@ W=${W:-/tmp/gate_serve}; LOG=$W/gate_serve.log; PY=${PY:-python3}
 DRV=${DRV:-$HERE/gate_o1_stubs/stub_driver.py}; GPU=${GPU:-0}
 if [[ "$DRV" == *stub_driver* ]]; then BITS=${BITS:-512}; N=${N:-12}; KS=${KS:-300}; S=${S:-97}
 else BITS=${BITS:-2048}; N=${N:-6}; KS=${KS:-100}; S=${S:-60}; fi     # real driver: production bit class; small rings (2048-bit primes cost ~0.3 s each to plant)
-CHUNK=${CHUNK:-8}; GROWTH=${GROWTH:-1.5}
+CHUNK=${CHUNK:-6}; GROWTH=${GROWTH:-1.15}
 KWIN=${KWIN:-1500}; TMAX=${TMAX:-3}; LOCK=$W/gpu.lock; Q=$W/queue
 rm -rf "$W"; mkdir -p "$W" "$Q"; say(){ echo "$@" | tee -a "$LOG"; }
 say "==== gate_serve v1.3 $(date -u +%FT%TZ) driver=$DRV driver_ee=${DRV_EE:-none} bits=$BITS rings=$N x $KS x $S chunk=$CHUNK growth=$GROWTH kwin=$KWIN"
@@ -36,7 +36,7 @@ FP=$(feeder); sleep 1
 for h in 101 102 103; do for b in "$W/hunt_s$h"/sc_r01_[0-9][0-9][0-9][0-9].bin; do submit "${b%.bin}" $h; done; done
 waitall "$W/hunt_s101" 600 && waitall "$W/hunt_s102" 600 && waitall "$W/hunt_s103" 600 && say "  all verdict files present" || say "  S1 FAIL: timeout waiting for verdicts"
 ok1=1; for h in 101 102 103; do compare_dir "$W/hunt_s$h" || ok1=0; done
-say "  ledger lines: $(wc -l < "$Q/ledger.jsonl")  done: $(ls "$Q/done" | wc -l)  failed: $(ls "$Q/failed" 2>/dev/null | wc -l)  claimed-left: $(ls "$Q/claimed" | wc -l)"
+say "  ledger lines: $(wc -l < "$Q/ledger.jsonl" 2>/dev/null || echo 0)  done: $(ls "$Q/done" | wc -l)  failed: $(ls "$Q/failed" 2>/dev/null | wc -l)  claimed-left: $(ls "$Q/claimed" | wc -l)"
 grep -E "rings,.*launches" "$W/feeder.log" | tail -3 | sed 's/^/  /' | tee -a "$LOG"
 kill "$FP" 2>/dev/null; wait "$FP" 2>/dev/null
 [ $ok1 -eq 1 ] && [ "$(ls "$Q/done" | wc -l)" -eq "$N" ] && say "S1: PASS" || { say "S1: FAIL"; exit 1; }

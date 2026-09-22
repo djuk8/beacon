@@ -97,24 +97,47 @@ class ScanSieve:
             np.save(f1, self.PEm)
         self.dq = int(cfg["deep_q"])
         if self.dq:
-            from deepsieve import primes_range
+            try:
+                from deepsieve import primes_range
+            except ImportError:
+                from deep_primes import primes_range   # kit-shipped fallback, same API
             self.qd = primes_range(cfg["Q"], self.dq, cache)
             f2 = os.path.join(cache,
                               f"pemd_{cfg['zd']}_{cfg['d']}_{self.dq}.npy")
+            f3 = os.path.join(cache, f"pemd64_{cfg['zd']}_{cfg['d']}_{self.dq}.npy")
             if os.path.exists(f2):
                 self.PEd = np.load(f2, mmap_mode="r")
+            elif os.path.exists(f3):
+                self.PEd = None                                                       # int64 primary exists (deep cache); no int32 table needed
+            elif self.dq >= 2 ** 31:                                                  # residues exceed int32 above ~2.1e9: build the int64 table DIRECTLY
+                tmp = f"{f3}.part{os.getpid()}.npy"
+                mm = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.int64, shape=(len(self.qd),))
+                B = 4_000_000
+                for i in range(0, len(self.qd), B):
+                    ql = self.qd[i:i + B].tolist()
+                    mm[i:i + len(ql)] = [P_eff % p for p in ql]
+                mm.flush(); del mm; os.replace(tmp, f3); self.PEd = None
             else:
-                mm = np.lib.format.open_memmap(f2, mode="w+", dtype=np.int32,
+                tmp2 = f"{f2}.part{os.getpid()}.npy"                                   # atomic: a crash can never leave a plausible half-built table
+                mm = np.lib.format.open_memmap(tmp2, mode="w+", dtype=np.int32,
                                                shape=(len(self.qd),))
                 B = 4_000_000
                 for i in range(0, len(self.qd), B):
                     ql = self.qd[i:i + B].tolist()
                     mm[i:i + len(ql)] = [P_eff % p for p in ql]
-                mm.flush(); del mm
+                mm.flush(); del mm; os.replace(tmp2, f2)
                 self.PEd = np.load(f2, mmap_mode="r")
         if self.dq:
-            self.qd = self.qd.astype(np.int64)
-            self.PEd64 = self.PEd[:].astype(np.int64)   # ~0.4 GB in RAM
+            if self.qd.dtype != np.int64: self.qd = self.qd.astype(np.int64)          # primes_range already stores int64 -> zero-copy memmap
+            f3 = os.path.join(cache, f"pemd64_{cfg['zd']}_{cfg['d']}_{self.dq}.npy")   # int64 twin of the residue table: shared page cache, no per-process copy (v8.5; needed for DEEPQ 1e9)
+            if not os.path.exists(f3):
+                assert self.PEd is not None, "deep residue table missing"
+                tmp = f"{f3}.part{os.getpid()}.npy"                                   # per-process temp: concurrent lazy builders cannot corrupt each other
+                mm = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.int64, shape=(len(self.qd),))
+                B = 8_000_000
+                for i in range(0, len(self.qd), B): mm[i:i + B] = self.PEd[i:i + B]
+                mm.flush(); del mm; os.replace(tmp, f3)
+            self.PEd64 = np.load(f3, mmap_mode="r")
 
     def survivors(self, k, jlo, jhi, n0=None, certify=True, use_deep=True):
         """Even-j survivors of [jlo, jhi] (n0 odd), shallow+deep sieved.
@@ -184,9 +207,10 @@ def cmd_make(a):
             "sc_state.json") else dict(cfg=cfg, next_t=0, blocks=[])
         assert st["cfg"]["zd"] == cfg["zd"] and st["cfg"]["seed"] == cfg["seed"]
         t0 = st["next_t"]
-        ks = [kstart(cfg) + 2 * (t0 + i) for i in range(a.kblock)]
+        kb = a.kblock * max(1, int(getattr(a, "select", 1)))          # --select N: one contiguous N*kblock progression, keep the sparsest 1/N
+        ks = [kstart(cfg) + 2 * (t0 + i) for i in range(kb)]
         ks = [k for k in ks if math.gcd(k, cfg["d"]) == 1]
-        st["next_t"] = t0 + a.kblock
+        st["next_t"] = t0 + kb
         assert st["next_t"] < 4 * 10 ** (cfg["kdig"] - 4), \
             "seed k-span exhausted -- move to a fresh seed"
         bid = len(st["blocks"]) + 1
@@ -207,7 +231,11 @@ def cmd_make(a):
           if os.path.exists(name + ".bin") else cfg.get("bits", 16384)) // 8
     t0 = time.time()
     fjs = None
-    if getattr(a, "fast", 1) and not (ud and sv.dq):
+    # Fast js are computed whenever --fast is on. Deep enters ONLY via the C packer at rung 1 (tier-1.5);
+    # rungs >=2 are fast-shallow exactly as pre-O3. The dense-deep legacy remains reachable only at --fast 0.
+    import fastmake as _fm_probe
+    _cpack = getattr(a, "fast", 1) >= 2 and getattr(_fm_probe, "IMPL", "") == "c"
+    if getattr(a, "fast", 1) and not _cpack:                 # fjs only feeds the numpy/legacy path; the C packer re-sieves itself
         try:
             import fastmake
             fjs = fastmake.block_js(np.array(ks, dtype=np.int64),
@@ -215,10 +243,26 @@ def cmd_make(a):
         except Exception as _e:
             print(f"fastmake unavailable ({_e}) -- legacy path")
     packed = None
-    if fjs is not None and getattr(a, "fast", 1) >= 2 and getattr(fastmake, "IMPL", "") == "c":
+    if _cpack:
+        import fastmake
         # v0.1 C path: sieve + center-out stable order + packing in fastmake_c; byte-identical to the loop below
-        pjs, psizes, packed = fastmake.block_pack(np.array(ks, dtype=np.int64), sv.prs, sv.PEm, lo, hi, int(P_eff), nb)
-        sizes = list(psizes); blobs = [(k, j.tolist(), None) for k, j in zip(ks, pjs)]
+        dq_on = bool(sv.dq) and r <= int(getattr(a, "deep_rings", 1))   # --deep-rings N: deepen rungs 1..N (FK walk makes annulus deepening per-prime cheap; v8.4)
+        nsel_ = int(getattr(a, "select", 1))
+        if r == 1 and nsel_ > 1:                                          # SPARSE-WINDOW SELECTION (SELECT_PREREG: x1.33 pass, rung-independent)
+            _ks, pjs, psizes = fastmake.block_sieve(np.array(ks, dtype=np.int64), sv.prs, sv.PEm, lo, hi,
+                                                     qd=sv.qd if dq_on else None, PEd=sv.PEd64 if dq_on else None)   # sieve the pool, pack only the keepers
+            keep = sorted(sorted(range(len(ks)), key=lambda i: psizes[i])[:len(ks) // nsel_])
+            ks = [ks[i] for i in keep]; pjs, psizes, packed = fastmake.pack_given(ks, [pjs[i] for i in keep], int(P_eff), nb)
+            sizes = list(psizes); blobs = [(k, j.tolist(), None) for k, j in zip(ks, pjs)]
+            print(f"select {nsel_}: pool {len(keep)*nsel_:,} windows -> kept {len(ks):,} sparsest (mean {sum(sizes)/max(len(sizes),1):.1f}/k)", flush=True)
+        else:
+            pjs, psizes, packed = fastmake.block_pack(np.array(ks, dtype=np.int64), sv.prs, sv.PEm, lo, hi, int(P_eff), nb,
+                                                      qd=sv.qd if dq_on else None, PEd=sv.PEd64 if dq_on else None)
+            sizes = list(psizes); blobs = [(k, j.tolist(), None) for k, j in zip(ks, pjs)]
+    print(f"make wall {time.time()-t0:.1f}s", flush=True)
+    print(f"make path: {('c-pack' + ('+deep' if (bool(sv.dq) and r == 1) else '')) if packed is not None else ('dense' + ('+DEEP-SLOW' if (ud and sv.dq) else ''))}", flush=True)
+    if packed is None and bool(sv.dq) and r == 1:
+        print("WARNING: rung-1 deep requested but C pack path unavailable -- dense fallback is ~200x slower; check fastmake/.so", flush=True)
     for i, k in enumerate(ks if packed is None else []):
         n0 = k * P_eff
         js = fjs[i] if fjs is not None else np.concatenate([
@@ -392,6 +436,9 @@ def main():
                     help="apply the 1e9 deep sieve only from this ring on "
                          "(early rings shallow: +~28%% GPU tests there, "
                          "~60x cheaper make)")
+
+    ap.add_argument("--deep-rings", type=int, default=1, help="deepen rungs 1..N with the C deepen (default 1 = rung 1 only)")
+    ap.add_argument("--select", type=int, default=1, help="rung-1 sparse-window selection: sieve N*kblock, keep the sparsest 1/N")
     ap.add_argument("--kblock", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--fast", type=int, default=2, help="0 legacy, 1 numpy kernel, 2 C kernel+pack (falls back if fastmake_c.so absent)")

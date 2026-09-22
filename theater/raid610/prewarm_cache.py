@@ -10,4 +10,31 @@ f1 = os.path.join(cache, f"pem_1439_2310_{Q}.npy")
 if not os.path.exists(f1):
     P_eff = primorial(1439) // 2310; prs = primes_upto(Q)
     np.save(f1 + ".part.npy", np.array([int(P_eff % int(p)) for p in prs], dtype=np.int64)); os.replace(f1 + ".part.npy", f1)
+dq = 0
+try: dq = int(open(os.path.expanduser("~/beacon/raid610/DEEPQ.txt")).read().strip())
+except Exception: pass
+if dq > Q:
+    from deep_primes import primes_range
+    qd = primes_range(Q, dq, cache)
+    f2 = os.path.join(cache, f"pemd_1439_2310_{dq}.npy")
+    if dq >= 2 ** 31 and not os.path.exists(os.path.join(cache, f"pemd64_1439_2310_{dq}.npy")):     # deep: int64 table directly (residues exceed int32)
+        f3 = os.path.join(cache, f"pemd64_1439_2310_{dq}.npy")
+        mm = np.lib.format.open_memmap(f3 + ".part.npy", mode="w+", dtype=np.int64, shape=(len(qd),))
+        Pf = primorial(1439) // 2310; B = 4_000_000
+        for i in range(0, len(qd), B): mm[i:i+len(qd[i:i+B])] = [int(Pf % int(x)) for x in qd[i:i+B].tolist()]
+        mm.flush(); del mm; os.replace(f3 + ".part.npy", f3)
+    if dq < 2 ** 31 and not os.path.exists(f2):
+        mm = np.lib.format.open_memmap(f2 + ".part.npy", mode="w+", dtype=np.int32, shape=(len(qd),))
+        Pf = primorial(1439) // 2310; B = 4_000_000
+        for i in range(0, len(qd), B):
+            mm[i:i+len(qd[i:i+B])] = [int(Pf % int(x)) for x in qd[i:i+B].tolist()]
+        mm.flush(); del mm; os.replace(f2 + ".part.npy", f2)
+    f3 = os.path.join(cache, f"pemd64_1439_2310_{dq}.npy")                     # int64 twin (zero-copy in makes; v8.5)
+    if not os.path.exists(f3) and os.path.exists(f2):
+        src = np.load(f2, mmap_mode="r")
+        mm = np.lib.format.open_memmap(f3 + ".part.npy", mode="w+", dtype=np.int64, shape=(len(qd),))
+        B = 8_000_000
+        for i in range(0, len(qd), B): mm[i:i+B] = src[i:i+B]
+        mm.flush(); del mm; os.replace(f3 + ".part.npy", f3)
+    print(f"deep cache ready: {len(qd):,} band primes + pemd + pemd64")
 print(f"cache ready: {f1} ({os.path.getsize(f1)} bytes)")

@@ -24,7 +24,7 @@ import sys, os, json, struct, time, argparse, subprocess, tempfile, shutil, mmap
 MAGIC_C, MAGIC_V = 0x31433247, 0x31563247
 STOP = threading.Event()
 
-def log(msg): sys.stderr.write(f"{time.strftime('%H:%M:%S')} ee_serve: {msg}\n"); sys.stderr.flush()
+def log(msg): sys.stderr.write(f"{time.strftime('%m-%d %H:%M:%S')} ee_serve: {msg}\n"); sys.stderr.flush()
 
 def schedule(chunk, growth, S):
     b = [0]; c = float(chunk)
@@ -259,7 +259,7 @@ def main():
     ap.add_argument("--kwin", type=int, default=330000, help="windows per mega-ring before launching"); ap.add_argument("--nmax", type=int, default=400)
     ap.add_argument("--tmax", type=float, default=20.0, help="rung-1 lane: max seconds the oldest request waits")
     ap.add_argument("--tmax-hi", dest="tmax_hi", type=float, default=1.5, help="rungs>=2 lane: fire once the oldest request is this old"); ap.add_argument("--poll", type=float, default=0.25)
-    ap.add_argument("--chunk", type=int, default=8); ap.add_argument("--growth", type=float, default=1.5)
+    ap.add_argument("--chunk", type=int, default=6); ap.add_argument("--growth", type=float, default=1.15)
     ap.add_argument("--marker", type=lambda s: int(s, 0), default=0x03); ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--lock", default=None); ap.add_argument("--tmp", default="/dev/shm" if os.path.isdir("/dev/shm") else None)
     ap.add_argument("--lanes", choices=("both", "r1", "hi"), default="both", help="which requests this process serves")

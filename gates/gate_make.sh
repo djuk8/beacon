@@ -63,4 +63,20 @@ stem=sc_r02_0001
 cmp -s "$W/np/$stem.bin" "$W/c/$stem.bin" && cmp -s "$W/np/$stem.manifest.json" "$W/c/$stem.manifest.json" && say "  C vs NP: BYTE-IDENTICAL" || { say "M2: FAIL C vs NP differ"; exit 1; }
 r=$(cmp_sets ref c $stem); say "  C vs REF: $r"; [ "$r" = "SET-IDENTICAL" ] || { say "M2: FAIL"; exit 1; }
 say "M2: PASS"
+say "--- M1D: deepened fast path vs pure-Q kernel (kblock 400, Q=1e6+deep1e8 vs Q=1e8) ---"
+D=$W/m1d; rm -rf $D; mkdir -p $D/a $D/b
+CRR=1568,4374,7244,10198,13500,17734,22818,31576
+( cd $D/a && $PY $HOME/beacon/raid610/scanhunt_v0.py make --round 1 --zd 1439 --swap 2 3 5 7 11 --kdig 13 --merit 45.0 --Q 1000000 --deep-q ${DEEPQ:-100000000} --deep-from-ring 1 --rings $CRR --bits 2048 --seed 9310 --kblock 400 > $D/a/make.out 2>&1 )
+grep -q "make path: c-pack+deep" $D/a/make.out || { say "M1D FAIL: deep make did not take the C path ($(grep -m1 'make path' $D/a/make.out))"; exit 1; }
+( cd $D/b && $PY $HOME/beacon/raid610/scanhunt_v0.py make --round 1 --zd 1439 --swap 2 3 5 7 11 --kdig 13 --merit 45.0 --Q ${DEEPQ:-100000000} --deep-q 0 --deep-from-ring 99 --rings $CRR --bits 2048 --seed 9310 --kblock 400 >/dev/null 2>&1 )
+$PY - "$D" <<'PYEOF'
+import json, sys
+d = sys.argv[1]
+A = json.load(open(d+"/a/sc_r01_0001.manifest.json")); B = json.load(open(d+"/b/sc_r01_0001.manifest.json"))
+bad = 0 if A["ks"]==B["ks"] else 1
+bad += sum(1 for x,y in zip(A["js"],B["js"]) if list(map(int,x))!=list(map(int,y)))
+print(("M1D: PASS (deep path == pure-Q kernel, order included, %d ks)" % len(A["ks"])) if bad==0 else "M1D: FAIL")
+sys.exit(0 if bad==0 else 1)
+PYEOF
+[ $? = 0 ] || { say "M1D FAIL"; exit 1; }
 say "==== gate_make: ALL PASS.  Install: bash install_make.sh (backs up the production files, hash receipt)."

@@ -9,11 +9,11 @@
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); W=${W:-/tmp/gate_r4}; LOG=$W/gate_r4.log; PY=${PY:-python3}
 MODE=${MODE:-gpu}; GPU=${GPU:-0}; P3=${P3:-$HOME/beacon/p3}; V2=${V2:-$P3/g1_fermat_v2}; V3=${V3:-$P3/g1_fermat_v3}
-CHUNK=${CHUNK:-8}; GROWTH=${GROWTH:-1.5}; N5=${N5:-40}; SCANHUNT=${SCANHUNT:-$HOME/beacon/raid610/scanhunt_v0.py}
+CHUNK=${CHUNK:-6}; GROWTH=${GROWTH:-1.15}; N5=${N5:-40}; SCANHUNT=${SCANHUNT:-$HOME/beacon/raid610/scanhunt_v0.py}
 FIXTURES=${FIXTURES:-}
 rm -rf "$W"; mkdir -p "$W"; need=$(( ${N5:-40} * 600 )); avail=$(df -m "$W" | awk 'NR==2{print $4}'); [ "$avail" -gt "$need" ] || { echo "need ~${need} MB free under $W (have ${avail}); set W= to a big filesystem"; exit 1; }
 say(){ echo "$@" | tee -a "$LOG"; }
-say "==== gate_r4 v1.0 $(date -u +%FT%TZ) mode=$MODE gpu=$GPU v2=$V2"
+say "==== gate_r4 v1.1 (R0 builds to $V3; backup before build) $(date -u +%FT%TZ) mode=$MODE gpu=$GPU v2=$V2"
 # ---------- R0
 if [ "$MODE" = gpu ] && [ "${SKIP_BUILD:-0}" = 1 ] && [ -x "$V3" ]; then say "R0: skipped (SKIP_BUILD=1, using $V3 $(sha256sum "$V3" | cut -c1-12))"
 elif [ "$MODE" = gpu ]; then
@@ -22,7 +22,8 @@ elif [ "$MODE" = gpu ]; then
   [ -d "$P3/../CGBN/include/cgbn" ] || { say "  cloning CGBN -> $P3/../CGBN"; git clone -q --depth 1 https://github.com/NVlabs/CGBN.git "$P3/../CGBN" || { say "R0: CGBN clone failed"; exit 1; }; }
   cp "$HERE/g1_fermat_v3.cu" "$P3/g1_fermat_v3.cu"
   CCBIN=$(command -v g++-12 >/dev/null 2>&1 && echo "-ccbin g++-12" || echo "")
-  ( cd "$P3" && $NVCC -O3 $CCBIN ${NVCCFLAGS:-} ${GENCODE:--gencode arch=compute_89,code=sm_89 -gencode arch=compute_120,code=sm_120 -gencode arch=compute_120,code=compute_120} -I../CGBN/include g1_fermat_v3.cu -o g1_fermat_v3 -lgmp ) > "$W/build.log" 2>&1 \
+  [ -x "$V3" ] && cp "$V3" "$V3.bak_$(sha256sum "$V3" | cut -c1-12)"   # never destroy a certified binary
+  ( cd "$P3" && $NVCC -O3 $CCBIN ${NVCCFLAGS:-} ${GENCODE:--gencode arch=compute_89,code=sm_89 -gencode arch=compute_120,code=sm_120 -gencode arch=compute_120,code=compute_120} -I../CGBN/include g1_fermat_v3.cu -o "$V3" -lgmp ) > "$W/build.log" 2>&1 \
     || { say "R0: build failed: $(grep -m3 error "$W/build.log")"; say "  (if only 'unsupported compiler': rerun with NVCCFLAGS=-allow-unsupported-compiler)"; exit 1; }
   say "  built $V3 $(sha256sum "$V3" | cut -c1-12)  src $(sha256sum "$HERE/g1_fermat_v3.cu" | cut -c1-12)  v2 $(sha256sum "$V2" | cut -c1-12)"
   say "R0: PASS"

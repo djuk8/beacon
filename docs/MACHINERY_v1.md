@@ -131,6 +131,11 @@ Loop cycle ~112 s; card saturates at ~90 loops; the card, not the feed, is the l
     traffic per rung-1 make; 560 concurrent makes want ~3x the box's bandwidth and the whole floor crawls.
     The single-core probe (21.5 s) cannot see this. T1b struck as standalone; deep Q belongs to O3's
     landing enumeration, whose touches scale with landings (~5,400/window), not (k,p) pairs. -C
+14. **A venue is a tuple; every consumer must read ALL of it.** The crown venue changed the edge list to 8
+    rungs while the loop's rung counter stayed hardcoded at 7: effective cap merit ~32.5 masquerading as 45
+    for a full day, invisible to G-L1/G-L2 (they gate the design and the mint, not the loop's coverage).
+    Rung count now derives from the edge list; the live confirmation is natural r8 fossils (~3/day expected).
+    Corollary: no 2>/dev/null on any copy whose absence would be silent. -C
 
 ## 9. Other venues (the machine is a tuple, not a target)
 
