@@ -129,3 +129,6 @@ Constants of record: box1 crown 27,550 w/s, t/w 67.2, 0.01488 beta_eff (docs/CRO
 | docs/session_handoff_21.md | box1 kit v8.51 / shredder RECORD | 8c4317ed35d0 | -- |
 | deploy/kit_v8/o1_kit_v8.51.tgz | as deployed on box1 2026-09-21 | 7216a839881b | sha 7216a839881b3051 |
 Deploy rule unchanged: repo=archive; NEVER sync repo->live theater mid-campaign.
+
+## 2026-09-24 - the fresh-box release
+First deploy of the framework on a machine that is not box1 (4x RTX 5090 rental): ten defects found and fixed in one pass - the kit tarball's nested o1_kit/ extraction; ladder_crown.json and resonance_map.py not shipped in the kit; g1_fermat_v3 depends on NVlabs CGBN and must be compiled from a directory adjacent to it; go_crown assumed box1's crontab backup (the watchdog was silently not armed) and box1's seeds; daily.sh failed with no ledger; the README still described the August kit as the stand-up. Fixed in kit v8.52 (SIEVESEED.txt knob in onstart, go_crown builds its crontab from scratch and takes the ladder design and resonance_map from the kit, daily.sh tolerates a fresh box) and deploy/fresh_box.sh, which reproduces the whole stand-up. The rental box runs seed 2500 (k0 2.1e13), disjoint from box1's range.

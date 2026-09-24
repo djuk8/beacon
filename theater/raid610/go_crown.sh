@@ -16,8 +16,9 @@ echo "$(date -u +%FT%TZ) RAID610 STOP (venue migration): procs left $(pgrep -fc 
 echo crown > VENUE.txt; echo 1000000 > Q.txt; echo 90 > LPC.txt; echo ${EXTRA:-85} > EXTRA.txt
 echo ${KWIN:-250000} > KWIN.txt
 echo ${DEEPQ:-100000000} > DEEPQ.txt; echo ${SELECT:-12} > SELECT.txt; echo ${DEEPR:-1} > DEEPR.txt; echo ${BSD:-3} > BSD.txt; echo ${BSDQ:-10000000000} > BSDQ.txt; echo ${BSDT:-4} > BSDT.txt; echo ${BSDN:-auto} > BSDN.txt; echo ${BSDS:-2} > BSDS.txt; echo ${BSDNICE:-5} > BSDNICE.txt; echo ${BSDPB:-100000} > BSDPB.txt; echo ${BSDALPHA:-0.6} > BSDALPHA.txt; echo ${TMAXHI:-1.5} > TMAXHI.txt; echo ${SIEVECARD:-3} > SIEVECARD.txt; echo ${SIEVETEST:-1} > SIEVETEST.txt; echo ${LADDER:-1} > LADDER.txt; echo ${LWORKERS:-12} > LWORKERS.txt; echo ${LMAXR1:-100} > LMAXR1.txt; echo ${GPUCORES:-0-31} > GPUCORES.txt; echo ${HERDCORES:-32-255} > HERDCORES.txt; echo ${MAKESLOTS:-64} > MAKESLOTS.txt; echo ${CHUNK:-6} > CHUNK.txt; echo ${GROWTH:-1.15} > GROWTH.txt
-[ -s ladder_crown.json ] || { echo "ladder_crown.json missing -- run G-L1 first"; exit 1; }
-$PY "$K/prewarm_cache.py" || exit 1
+[ -s ladder_crown.json ] || cp "$K/ladder_crown.json" . 2>/dev/null; [ -s ladder_crown.json ] || { echo "ladder_crown.json missing -- run G-L1 first (or copy theater/raid610/ladder_crown.json from the repo)"; exit 1; }
+cp "$K/resonance_map.py" "$R/" 2>/dev/null; [ -f "$R/resonance_map.py" ] || { echo "resonance_map.py missing from the kit"; exit 1; }
+PYTHONPATH="$R:$K" $PY "$K/prewarm_cache.py" || exit 1
 cp "$K/raid_loop_v2.sh" "$R/raid_loop_v2.sh"; chmod +x "$R/raid_loop_v2.sh"; cp "$K/ladder.py" "$R/ladder.py"
 cp "$K/scanhunt_v0.py" "$K/fastmake.py" "$K/deep_primes.py" "$R/" && ( cd "$R" && gcc -O3 -shared -fPIC -o fastmake_c.so "$K/fastmake_c.c" ) || { echo "deep install failed"; exit 1; }
 cp $K/bsd.py $K/gbsd.py $K/bs_api.c $K/bsieve.c $K/gbs.cu ~/beacon/raid610/ && (cd ~/beacon/raid610 && gcc -O3 -shared -fPIC -o bs_api.so bs_api.c -lpthread && ([ -f gbs.so ] && [ gbs.so -nt gbs.cu ] || /usr/local/cuda/bin/nvcc -O3 -shared -Xcompiler -fPIC -gencode arch=compute_120,code=sm_120 -o gbs.so gbs.cu)) || { echo "bs_api.so build FAILED"; exit 1; }
@@ -33,7 +34,7 @@ B=$(ls sc_r01_[0-9]*.bin | head -1)
 grep -q "PASS" "$W/gate.log" || { echo "G-L2: FAIL -- venue NOT launched"; exit 1; }
 rm -f "$W/$B" 2>/dev/null
 echo "$(date -u +%FT%TZ) G-L2 PASS ($B)" | tee -a "$R/shadow_receipts.txt"
-cd "$R"; B2=$(ls -t $P3/crontab_backup_*.txt | head -1); sed "s|onstart_raid.sh|onstart_raid_v2.sh|g" "$B2" > /tmp/cron_v2.txt; grep -q "queue/c\*/done" /tmp/cron_v2.txt || echo '23 * * * * find /root/beacon/raid610/queue/c*/done -name "*.json" -mmin +60 -delete' >> /tmp/cron_v2.txt
+cd "$R"; B2=$(ls -t $P3/crontab_backup_*.txt 2>/dev/null | head -1); if [ -n "$B2" ]; then sed "s|onstart_raid.sh|onstart_raid_v2.sh|g" "$B2" > /tmp/cron_v2.txt; else printf "@reboot /root/onstart_raid_v2.sh\n*/10 * * * * /root/onstart_raid_v2.sh\n" > /tmp/cron_v2.txt; fi; grep -q "queue/c\*/done" /tmp/cron_v2.txt || echo '23 * * * * find /root/beacon/raid610/queue/c*/done -name "*.json" -mmin +60 -delete' >> /tmp/cron_v2.txt
 grep -q 'sc_r0\[678\]' /tmp/cron_v2.txt || echo '17 * * * * find /root/beacon/raid610/hunt_s1* -name "sc_r0[678]_*.bin" -mmin +5 -delete' >> /tmp/cron_v2.txt
 grep -q "harvest_hourly.sh" /tmp/cron_v2.txt || echo "17 * * * * /root/beacon/p3/o1_kit/harvest_hourly.sh >> /root/beacon/raid610/harvest.log 2>&1" >> /tmp/cron_v2.txt   # hourly fossil harvest (the old sweeper died 2026-08-25 unnoticed for 24 days)
 crontab /tmp/cron_v2.txt

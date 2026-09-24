@@ -34,7 +34,7 @@ for k in sorted(W):
 print(f"windows in window: {tot:,}   mean w/s {tot/(H*3600):,.0f}   crown-effective {tot/(H*3600)*1.42:,.0f}")
 PY
 echo "--- harvest ---"; tail -2 harvest.log 2>/dev/null | cut -c1-120
-echo "--- ledger ---"; L=$(wc -l < campaign_ledger.log 2>/dev/null || echo 0); T=$(date -u -d "$H hours ago" +%FT%TZ)
+echo "--- ledger ---"; [ -f campaign_ledger.log ] || { echo "no ledger yet (no walks on this box)"; exit 0; }; echo ""; L=$(wc -l < campaign_ledger.log 2>/dev/null || echo 0); T=$(date -u -d "$H hours ago" +%FT%TZ)
 NEW=$(awk -v t="$T" '$6 > t' campaign_ledger.log 2>/dev/null); echo "walked total $L | new in window: $(echo "$NEW" | grep -c .) | >=30: $(echo "$NEW" | awk '$2>=30' | grep -c .) | >=32: $(echo "$NEW" | awk '$2>=32' | grep -c .) | >=36: $(echo "$NEW" | awk '$2>=36' | grep -c .)"
 echo "best new:"; echo "$NEW" | sort -k2 -gr | head -3 | awk '{printf "    gap %s merit %s k=%s (%s)\n", $1, $2, $3, $7}'
 echo "all-time top:"; sort -k2 -gr campaign_ledger.log 2>/dev/null | head -3 | awk '{printf "    gap %s merit %s k=%s %s\n", $1, $2, $3, substr($6,1,10)}'

@@ -7,6 +7,22 @@ and the data archive it describes.
 
 ---
 
+## Quick start - a fresh GPU box in one command
+
+Any Linux machine with NVIDIA GPUs, the CUDA 12 toolkit, gcc, git, python3 and pari-gp:
+
+    python3 -m pip install numpy gmpy2
+    git clone https://github.com/djuk8/beacon ~/lab/beacon && cd ~/lab/beacon
+    bash deploy/fresh_box.sh --seed 2500
+
+`fresh_box.sh` extracts the kit, clones NVlabs' CGBN and builds the GPU Fermat driver for your card, writes the venue and seed files, builds the residue cache (about 15 minutes), builds the C and CUDA sieve, runs the identity gate (the GPU sieve against an independent CPU sieve, byte for byte) and launches the hunt with a watchdog that relaunches anything that dies. Twenty minutes later:
+
+    bash ~/beacon/p3/o1_kit/daily.sh
+
+prints throughput per four-hour slice, the fossil audit, the harvest and the day's best gaps. A healthy box reads about 11,000 windows/s per RTX 5090 with all GPUs at 100% (the first hour ramps). Every gap the hourly harvest walks lands in `~/beacon/raid610/campaign_ledger.log`; `tools/notary_v2.py` re-derives any gap from its tuple, `tools/certify_batch.py` proves the endpoints with ECPP, and the lines those tools print go to the Prime Gap List's submission server.
+
+The seed picks the k-range: k0 = 10^12 + 8·10^9·seed, and boxes must not share one (box1 ran seed 2004; use 2500, 3000, 3500 ... for new machines). The current tree is stamped by `STAMP_20260924.sha256`; `sha256sum -c STAMP_20260924.sha256 --quiet` verifies it.
+
 ## 1. The game, from zero
 
 A **prime gap** is the distance between two consecutive prime numbers.
@@ -245,13 +261,7 @@ raw manifests, databases) ships as a separate data archive with a DOI.
 
 ## 8. Running it
 
-`deploy/kit_v1/` is a zero-compile stand-up: seven files plus a
-certified GPU binary take a fresh 4×GPU machine from first login to a
-certified, self-healing hunt in under thirty minutes (quota read →
-deploy → pilot one card → statistical band check → scale → one
-observed self-resurrection of the watchdog). The runbook page in
-`docs/` is the checklist. You will want: Python 3 + numpy (+ gmpy2 for
-verification), PFGW for CPU-height work, and CUDA 12+ for the kernel.
+`deploy/kit_v8/` holds the September kit (o1_kit v8.52) - the machinery that set the record; `deploy/fresh_box.sh` stands it up (quick start below). `history/kit_v1_2026-08/` is the August kit, kept as history.
 
 ## 9. Standing on shoulders
 
@@ -303,5 +313,5 @@ DOI land with the public release.*
 
 ## Environment
 Python 3.10+, numpy (gmpy2 for verification). GPU path: CUDA 12+
-(kernel ships prebuilt in deploy/kit_v1). CPU-height path: PFGW
+(kernel source in cuda/g1_fermat_v3.cu; built by deploy/fresh_box.sh). CPU-height path: PFGW
 (sourceforge; expression syntax used throughout).
