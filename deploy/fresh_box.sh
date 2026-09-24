@@ -19,8 +19,8 @@ for f in resonance_map.py ladder_crown.json g1_fermat_v3.cu onstart_raid_v2.sh g
 cp "$K/resonance_map.py" "$K/ladder_crown.json" "$R/"; say "kit $(basename $KIT) -> $K ($(ls $K | wc -l) files); theater $R"
 # 2. the GPU driver: CGBN as a sibling of the source directory (the .cu includes ../CGBN/... relative to itself)
 [ -d "$P3/CGBN" ] || git clone -q --depth 1 https://github.com/NVlabs/CGBN "$P3/CGBN" || die "git clone CGBN"
-mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
-"$P3/g1_fermat_v3" --help 2>&1 | grep -q usage || die "g1_fermat_v3 does not run"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
+[ -x "$P3/g1_fermat_v3" ] || { mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); }; [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
+OUT=$("$P3/g1_fermat_v3" --help 2>&1 || true); echo "$OUT" | grep -q usage || die "g1_fermat_v3 does not run: $OUT"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
 # 3. seed knob, then go_crown does the rest: venue files, residue cache (~15 min), C/CUDA sieve builds, G-L2 gate, crontab, launch
 echo "$SEED" > "$R/SIEVESEED.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))"
 [ "$LAUNCH" = 1 ] || { say "--no-launch: stopping before go_crown (run it yourself from $R: bash $K/go_crown.sh)"; exit 0; }
