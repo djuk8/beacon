@@ -1,10 +1,7 @@
 # BEACON — Prime Gap Records by Design
 
 *A measured cost law for prime-gap records, and the pipeline that hunts
-them.* This repository is private until coordinated disclosure; on
-release day it ships together with the record submissions, the papers,
-and the data archive it describes.
-
+them.* 
 ---
 
 ## Quick start - a fresh GPU box in one command
@@ -304,12 +301,7 @@ knowledge"; the audit numbers stand as measurements regardless.
 
 ---
 
-*BEACON is M. Vojvoda's campaign (records under the handle Djuk8),
-with Claude (Anthropic) as the AI research assistant — whose mistakes
-appear, by name, in the corrections ledger. Companion papers: the
-crossover/2-adic swap paper, the squarefree singular-series paper, and
-the pipeline/cost-law paper built from this repository. License and
-DOI land with the public release.*
+*BEACON is M. Vojvoda's campaign (records under the handle mvojvoda).
 
 ## Environment
 Python 3.10+, numpy (gmpy2 for verification). GPU path: CUDA 12+
