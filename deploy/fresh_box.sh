@@ -17,10 +17,11 @@ KIT=$(ls "$REPO"/deploy/kit_v8/o1_kit_v8.*.tgz | sort -V | tail -1); [ -n "$KIT"
 mkdir -p "$P3" "$R"; rm -rf "$K"; tar xzf "$KIT" -C "$P3" || die "kit extract"; [ -d "$K" ] || die "kit tarball must contain a top-level o1_kit/ directory"
 for f in resonance_map.py ladder_crown.json g1_fermat_v3.cu onstart_raid_v2.sh go_crown.sh daily.sh harvest_hourly.sh; do [ -f "$K/$f" ] || cp "$REPO"/tools/$f "$K/" 2>/dev/null || cp "$REPO"/theater/raid610/$f "$K/" 2>/dev/null || cp "$REPO"/cuda/$f "$K/" 2>/dev/null; [ -f "$K/$f" ] || die "kit file missing: $f"; done
 cp "$K/resonance_map.py" "$K/ladder_crown.json" "$R/"; say "kit $(basename $KIT) -> $K ($(ls $K | wc -l) files); theater $R"
+echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVESEED2.txt"   # early seed: written before any step that can fail, so the watchdog never starts a sieve on a default range
 # 2. the GPU driver: CGBN as a sibling of the source directory (the .cu includes ../CGBN/... relative to itself)
 [ -d "$P3/CGBN" ] || git clone -q --depth 1 https://github.com/NVlabs/CGBN "$P3/CGBN" || die "git clone CGBN"
-mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
-"$P3/g1_fermat_v3" --help 2>&1 | grep -q usage || die "g1_fermat_v3 does not run"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
+[ -x "$P3/g1_fermat_v3" ] || { mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); }; [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
+OUT=$("$P3/g1_fermat_v3" --help 2>&1 || true); echo "$OUT" | grep -q usage || die "g1_fermat_v3 does not run: $OUT"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
 # 3. seed knob, then go_crown does the rest: venue files, residue cache (~15 min), C/CUDA sieve builds, G-L2 gate, crontab, launch
 echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVESEED2.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))${SEED2:+, second sieve card seed $SEED2}; cards: $NG (above 4, cards 4-7 get their own sieve card)"
 cp "$K/venue.py" "$R/"; if [ "$VENUE" != crown ]; then [ -f "$K/venue$VENUE.json" ] || die "no venue file venue$VENUE.json in the kit"; cp "$K/venue$VENUE.json" "$R/VENUE.json"; fi
