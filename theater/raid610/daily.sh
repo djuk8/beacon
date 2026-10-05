@@ -5,7 +5,7 @@ echo "=== BEACON daily read  $(date -u +%FT%TZ)  (last $H h) ==="
 /venv/main/bin/python3 - "$H" <<'PY'
 import json, time, glob, os, collections, sys
 H = int(sys.argv[1]); now = time.time(); S = 4 * 3600; W = {}; r7t = collections.Counter(); r8t = collections.Counter()
-for c in '0123':
+for c in [d[1:] for d in sorted(os.listdir('queue')) if d.startswith('c')] if os.path.isdir('queue') else []:
     p = f'queue/c{c}/ledger.jsonl'
     if not os.path.exists(p): continue
     with open(p, 'rb') as f:

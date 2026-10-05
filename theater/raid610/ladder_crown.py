@@ -25,7 +25,9 @@ from resonance_map import primes_upto, primorial
 sys.set_int_max_str_digits(2_000_000)
 GAMMA = 0.5772156649015329
 
-ZD, SWAP, KDIG, MERIT, Q = 1439, (2, 3, 5, 7, 11), 13, 45.0, 10 ** 6
+import venue as _venue; _V = _venue.load()
+ZD, SWAP, KDIG, MERIT, Q = _V["zd"], tuple(_V["swap"]), _V["kdig"], float(_V["merit"]), 10 ** 6
+LADDER_FILE = _V["ladder"]
 ETARG = [1.7, 3.4, 5.4, 7.8, 10.8, 15.0, 20.5]
 
 
@@ -100,13 +102,13 @@ def cmd_edges():
     print(f"full-window E (sample) = {cum_e[half]:.2f} "
           f"(crown prereg band set by G-L1 from this run; raid610 was 24.7-25.1)")
     json.dump(dict(edges=edges, cum_e=[float(x) for x in de],
-                   G=G, half=half), open("ladder_crown.json", "w"))
-    print("-> ladder_crown.json (gate mode reads this)")
+                   G=G, half=half), open(LADDER_FILE, "w"))
+    print(f"-> {LADDER_FILE} (gate mode reads this)")
 
 
 def cmd_gate(name):
     d, P_eff, prs, PEm, ln_n0, G, beta = setup()
-    lad = json.load(open("ladder_crown.json"))
+    lad = json.load(open(LADDER_FILE))
     man = json.load(open(name + ".manifest.json"))
     assert man["cfg"]["zd"] == ZD and man["cfg"]["d"] == d, "config mismatch"
     edges = man["cfg"]["edges"]

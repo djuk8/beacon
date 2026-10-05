@@ -21,14 +21,18 @@ BSDNICE=$(kn BSDNICE 5)
 BSDPB=$(kn BSDPB 100000)
 BSDALPHA=$(kn BSDALPHA 0.6)
 TMAXHI=$(kn TMAXHI 1.5)
-GPUCORES=$(kn GPUCORES 0-31)
-HERDCORES=$(kn HERDCORES 32-255)
-SIEVECARD=$(kn SIEVECARD 3)
+NPT=$(nproc); NGPU=$(nvidia-smi -L 2>/dev/null | wc -l); [ "$NGPU" -ge 1 ] || NGPU=4; GC=$((NGPU*8)); [ $GC -gt $((NPT/2)) ] && GC=$((NPT/2))
+GPUCORES=$(kn GPUCORES 0-$((GC-1)))         # feeders: 8 threads per card by default (pin to the GPUs' NUMA node on multi-socket boxes: nvidia-smi topo -m)
+HERDCORES=$(kn HERDCORES $GC-$((NPT-1)))    # sieve, ladders, harvest: the rest
+NCARDS=$(kn NCARDS $(nvidia-smi -L 2>/dev/null | wc -l)); [ "$NCARDS" -ge 1 ] || NCARDS=4; ALLCARDS=$(seq -s " " 0 $((NCARDS-1)))
+SIEVECARD=$(kn SIEVECARD $((NCARDS>4 ? 3 : NCARDS-1)))   # first sieve card; with more than 4 cards a second sieve card serves cards 4..7 (SIEVECARD2, seed SIEVESEED2.txt = SIEVESEED+250 by default)
+SIEVECARD2=$(kn SIEVECARD2 $((NCARDS>4 ? 7 : -1)))
 SIEVETEST=$(kn SIEVETEST 1)
 LADDER=$(kn LADDER 1)
+read VZD VBITS VRINGS VLAD <<< "$(cd /root/beacon/raid610 && PYTHONPATH=/root/beacon/raid610:/root/beacon/p3/o1_kit /venv/main/bin/python3 -c "import venue; v=venue.load(); print(v['zd'], v['bits'], v['rings'], v['ladder'])")"
 LWORKERS=$(kn LWORKERS 12)
 LMAXR1=$(kn LMAXR1 100)
-if [ "$BSD" = 3 ] && [ "$SIEVETEST" = 0 ]; then CARDS=$(for c in 0 1 2 3; do [ $c != $SIEVECARD ] && printf "%s " $c; done); else CARDS="0 1 2 3"; fi   # SIEVETEST=1: the sieve card also tests (the daemon takes ~6% of it)
+if [ "$BSD" = 3 ] && [ "$SIEVETEST" = 0 ]; then CARDS=$(for c in $ALLCARDS; do [ $c != $SIEVECARD ] && [ $c != $SIEVECARD2 ] && printf "%s " $c; done); else CARDS="$ALLCARDS"; fi   # SIEVETEST=1: the sieve card also tests (the daemon takes ~6% of it)
 if [ "$BSDN" = auto ]; then
   NP=$(nproc); NG=$(nvidia-smi -L 2>/dev/null | wc -l); [ "$NG" -gt 0 ] || NG=4; FREEG=$(free -g | awk '/Mem:/{print $7}'); STATEG=$(( BSDQ / 45000000 + 1 ))
   BSDN=$(( (NP - 12*NG - 40) / 10 / NG )); [ $BSDN -gt 4 ] && BSDN=4; MAXMEM=$(( (FREEG - 60) / (STATEG * NG) )); [ $BSDN -gt $MAXMEM ] && BSDN=$MAXMEM; [ $BSDN -lt 0 ] && BSDN=0
@@ -37,9 +41,16 @@ fi
 if [ "$BSD" = 0 ]; then echo 0 > $R610/BSDN_EFF.txt; elif [ "$BSD" = 3 ]; then echo 1 > $R610/BSDN_EFF.txt; else echo "$BSDN" > $R610/BSDN_EFF.txt; fi   # BSD=3: the sieve card IS the daemon -> loops wait
 echo "$(date -u) knobs: LADDER=$LADDER GPUCORES=$GPUCORES HERDCORES=$HERDCORES BSD=$BSD SIEVECARD=$SIEVECARD CARDS=[$CARDS] BSDQ=$BSDQ BSDN=$BSDN BSDT=$BSDT BSDS=$BSDS BSDNICE=$BSDNICE BSDPB=$BSDPB BSDALPHA=$BSDALPHA TMAXHI=$TMAXHI"
 if [ "$BSD" = 1 ] || [ "$BSD" = 2 ] || [ "$BSD" = 3 ]; then mkdir -p /dev/shm/ready; [ -L /root/beacon/raid610/ready ] || { rm -rf /root/beacon/raid610/ready; ln -sfn /dev/shm/ready /root/beacon/raid610/ready; }; pgrep -f "sampler.sh" >/dev/null || ( setsid -f nohup bash /root/beacon/p3/o1_kit/sampler.sh > /dev/null 2>&1 < /dev/null 9>&- & )   # 9>&- : never inherit onstart's singleton lock (the sampler held it and every later onstart exited at once)
-for c in 0 1 2 3; do mkdir -p /dev/shm/ready/c$c; done
-if [ "$BSD" = 3 ]; then SEED=$(cat /root/beacon/raid610/SIEVESEED.txt 2>/dev/null || echo $((2001+SIEVECARD))); SERVE=$(echo $CARDS | tr ' ' ','); pgrep -f "gbsd.py --seed $SEED " >/dev/null || { echo "$(date -u) SIEVE CARD c$SIEVECARD seed $SEED serving $SERVE"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n $BSDNICE taskset -c $HERDCORES /venv/main/bin/python3 /root/beacon/raid610/gbsd.py --seed $SEED --card $SIEVECARD --out /dev/shm/ready --serve $SERVE --deepq $BSDQ --select $(cat /root/beacon/raid610/SELECT.txt 2>/dev/null || echo 12) --ahead 48 --pred-pb $BSDPB --alpha $BSDALPHA --api /root/beacon/raid610/bs_api.so --gpu-api /root/beacon/raid610/gbs.so >> /root/beacon/raid610/gbsd_sieve.log 2>&1 </dev/null 9>&- & ); }; fi
-for c in $( [ "$BSD" = 3 ] && echo "" || echo "0 1 2 3" ); do
+for c in $ALLCARDS; do mkdir -p /dev/shm/ready/c$c; done
+if [ "$BSD" = 3 ]; then
+  SEED=$(cat /root/beacon/raid610/SIEVESEED.txt 2>/dev/null || echo $((2001+SIEVECARD))); SERVE=$(for c in $CARDS; do [ $c -lt 4 ] && printf "%s," $c; done | sed 's/,$//'); [ "$NCARDS" -le 4 ] && SERVE=$(echo $CARDS | tr ' ' ',')
+  pgrep -f "gbsd.py --seed $SEED " >/dev/null || { echo "$(date -u) SIEVE CARD c$SIEVECARD seed $SEED serving $SERVE"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n $BSDNICE taskset -c $HERDCORES /venv/main/bin/python3 /root/beacon/raid610/gbsd.py --seed $SEED --card $SIEVECARD --out /dev/shm/ready --serve $SERVE --zd $VZD --bits $VBITS --rings $VRINGS --deepq $BSDQ --select $(cat /root/beacon/raid610/SELECT.txt 2>/dev/null || echo 12) --ahead 48 --pred-pb $BSDPB --alpha $BSDALPHA --api /root/beacon/raid610/bs_api.so --gpu-api /root/beacon/raid610/gbs.so >> /root/beacon/raid610/gbsd_sieve.log 2>&1 </dev/null 9>&- & ); }
+  if [ "$SIEVECARD2" -ge 0 ]; then
+    SEED2=$(cat /root/beacon/raid610/SIEVESEED2.txt 2>/dev/null || echo $((SEED+250))); SERVE2=$(for c in $CARDS; do [ $c -ge 4 ] && printf "%s," $c; done | sed 's/,$//')
+    [ -n "$SERVE2" ] && { pgrep -f "gbsd.py --seed $SEED2 " >/dev/null || { echo "$(date -u) SIEVE CARD c$SIEVECARD2 seed $SEED2 serving $SERVE2"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n $BSDNICE taskset -c $HERDCORES /venv/main/bin/python3 /root/beacon/raid610/gbsd.py --seed $SEED2 --card $SIEVECARD2 --out /dev/shm/ready --serve $SERVE2 --zd $VZD --bits $VBITS --rings $VRINGS --deepq $BSDQ --select $(cat /root/beacon/raid610/SELECT.txt 2>/dev/null || echo 12) --ahead 48 --pred-pb $BSDPB --alpha $BSDALPHA --api /root/beacon/raid610/bs_api.so --gpu-api /root/beacon/raid610/gbs.so >> /root/beacon/raid610/gbsd_sieve2.log 2>&1 </dev/null 9>&- & ); }; }
+  fi
+fi
+for c in $( [ "$BSD" = 3 ] && echo "" || echo "$ALLCARDS" ); do
   if [ "$BSD" = 2 ]; then SEED=$((2001+c)); pgrep -f "gbsd.py --seed $SEED " >/dev/null || { echo "$(date -u) GBS daemon c$c seed $SEED (GPU-resident sieve)"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n $BSDNICE /venv/main/bin/python3 /root/beacon/raid610/gbsd.py --seed $SEED --card $c --out /root/beacon/raid610/ready/c$c --deepq $BSDQ --select $(cat /root/beacon/raid610/SELECT.txt 2>/dev/null || echo 12) --ahead 64 --api /root/beacon/raid610/bs_api.so --gpu-api /root/beacon/raid610/gbs.so >> /root/beacon/raid610/gbsd_c$c.log 2>&1 </dev/null 9>&- & ); }; continue; fi
   for d in $(seq 0 $((BSDN-1))); do SEED=$((2001+c+10*d))
     pgrep -f "bsd.py --seed $SEED " >/dev/null || { echo "$(date -u) BSD daemon c$c #$d seed $SEED"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n $BSDNICE /venv/main/bin/python3 /root/beacon/raid610/bsd.py --seed $SEED --card $c --out /root/beacon/raid610/ready/c$c --deepq $BSDQ --threads $BSDT --shallow-threads $BSDS --pred-pb $BSDPB --alpha $BSDALPHA --pred-threads 4 --select $(cat /root/beacon/raid610/SELECT.txt 2>/dev/null || echo 12) --ahead 24 --bid-start $((d+1)) --bid-step $BSDN >> /root/beacon/raid610/bsd_c${c}_$d.log 2>&1 </dev/null 9>&- & ); }
@@ -57,7 +68,7 @@ pgrep -f raid_loop_v2.sh && exit 0
 echo "$(date -u) WATCHDOG RELAUNCH"
 LPC=${LPC:-$(cat /root/beacon/raid610/LPC.txt 2>/dev/null || echo 90)}    # loops per card; seeds 101 .. 100+4*LPC (<= 460 keeps box4/box5 blocks free)
 if [ "$LADDER" = 1 ]; then
-  for c in $CARDS; do SEEDS="$((SEED0+c*LPC))-$((SEED0-1+(c+1)*LPC)),$((SEED0+601+c*EXTRA))-$((SEED0+600+(c+1)*EXTRA))"
+  for c in $CARDS; do SEEDS="$((SEED0+c*LPC))-$((SEED0-1+(c+1)*LPC)),$((SEED0+NCARDS*LPC+1+c*EXTRA))-$((SEED0+NCARDS*LPC+(c+1)*EXTRA))"
     pgrep -f "ladder.py --card $c " >/dev/null || { echo "$(date -u) LADDER c$c seeds $SEEDS workers $LWORKERS"; ( cd /root/beacon/raid610 && setsid -f nohup nice -n 10 taskset -c $HERDCORES /venv/main/bin/python3 /root/beacon/raid610/ladder.py --card $c --seeds $SEEDS --workers $LWORKERS --max-r1 ${LMAXR1:-100} --kitdir /root/beacon/raid610 >> /root/beacon/raid610/ladder_c$c.log 2>&1 </dev/null 9>&- & ); }
   done
 else

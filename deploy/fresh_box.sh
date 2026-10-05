@@ -1,11 +1,11 @@
 #!/bin/bash
 # fresh_box.sh -- a fresh GPU box from the repo tree to a certified, running hunt, in one supervised pass.
 # Written from the first fresh-box test (2026-09-24, 4x RTX 5090): every step below was a stop that day, in this order.
-# Usage: bash deploy/fresh_box.sh [--seed SIEVESEED] [--no-launch]     (run as root from the repo root; CUDA 12 toolkit, gcc, python3 with numpy+gmpy2, pari-gp)
+# Usage: bash deploy/fresh_box.sh [--seed SIEVESEED] [--seed2 SIEVESEED2] [--venue crown|300] [--no-launch]   (8-card boxes: two sieve cards, seed2 defaults to seed+250)     (run as root from the repo root; CUDA 12 toolkit, gcc, python3 with numpy+gmpy2, pari-gp)
 # Seeds: k0 = 1e12 + 8e9*seed. box1 used 2004 (k0 1.70e13, walked to ~1.76e13). New boxes: 2500, 3000, 3500 ... (500 apart = 4e12 in k, ~40 box-days each).
 set -uo pipefail
-REPO=$(cd "$(dirname "$0")/.." && pwd); P3=$HOME/beacon/p3; K=$P3/o1_kit; R=$HOME/beacon/raid610; SEED=2500; LAUNCH=1
-while [ $# -gt 0 ]; do case $1 in --seed) SEED=$2; shift;; --no-launch) LAUNCH=0;; esac; shift; done
+REPO=$(cd "$(dirname "$0")/.." && pwd); P3=$HOME/beacon/p3; K=$P3/o1_kit; R=$HOME/beacon/raid610; SEED=2500; SEED2=; LAUNCH=1; VENUE=crown
+while [ $# -gt 0 ]; do case $1 in --seed) SEED=$2; shift;; --seed2) SEED2=$2; shift;; --venue) VENUE=$2; shift;; --no-launch) LAUNCH=0;; esac; shift; done
 say(){ echo "$(date -u +%FT%TZ) fresh_box: $*"; }; die(){ say "FAIL: $*"; exit 1; }
 # 0. prerequisites
 for t in nvcc gcc git nvidia-smi gp; do command -v $t >/dev/null || die "$t not on PATH (CUDA toolkit / build-essential / git / pari-gp)"; done
@@ -19,10 +19,13 @@ for f in resonance_map.py ladder_crown.json g1_fermat_v3.cu onstart_raid_v2.sh g
 cp "$K/resonance_map.py" "$K/ladder_crown.json" "$R/"; say "kit $(basename $KIT) -> $K ($(ls $K | wc -l) files); theater $R"
 # 2. the GPU driver: CGBN as a sibling of the source directory (the .cu includes ../CGBN/... relative to itself)
 [ -d "$P3/CGBN" ] || git clone -q --depth 1 https://github.com/NVlabs/CGBN "$P3/CGBN" || die "git clone CGBN"
-[ -x "$P3/g1_fermat_v3" ] || { mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); }; [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
-OUT=$("$P3/g1_fermat_v3" --help 2>&1 || true); echo "$OUT" | grep -q usage || die "g1_fermat_v3 does not run: $OUT"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
+mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
+"$P3/g1_fermat_v3" --help 2>&1 | grep -q usage || die "g1_fermat_v3 does not run"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
 # 3. seed knob, then go_crown does the rest: venue files, residue cache (~15 min), C/CUDA sieve builds, G-L2 gate, crontab, launch
-echo "$SEED" > "$R/SIEVESEED.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))"
+echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVESEED2.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))${SEED2:+, second sieve card seed $SEED2}; cards: $NG (above 4, cards 4-7 get their own sieve card)"
+cp "$K/venue.py" "$R/"; if [ "$VENUE" != crown ]; then [ -f "$K/venue$VENUE.json" ] || die "no venue file venue$VENUE.json in the kit"; cp "$K/venue$VENUE.json" "$R/VENUE.json"; fi
+read VBITS VLAD <<< "$(cd "$R" && PYTHONPATH="$R:$K" $PY -c "import venue; v=venue.load(); print(v['bits'], v['ladder'])")"; say "venue $VENUE (driver class $VBITS bits, ladder $VLAD)"
+[ -s "$R/$VLAD" ] || [ -f "$K/$VLAD" ] && cp "$K/$VLAD" "$R/" 2>/dev/null; [ -s "$R/$VLAD" ] || { say "designing the ladder for this venue (a minute or two)"; ( cd "$R" && PYTHONPATH="$R:$K" $PY "$K/ladder_crown.py" edges > ladder_design.log 2>&1 ); [ -s "$R/$VLAD" ] || die "ladder design failed (see $R/ladder_design.log)"; }
 [ "$LAUNCH" = 1 ] || { say "--no-launch: stopping before go_crown (run it yourself from $R: bash $K/go_crown.sh)"; exit 0; }
 cd "$R" && bash "$K/go_crown.sh" 2>&1 | tail -8
 ( crontab -l 2>/dev/null; echo "17 * * * * $K/harvest_hourly.sh >> $R/harvest.log 2>&1" ) | sort -u | crontab -

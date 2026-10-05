@@ -13,14 +13,16 @@ import os, sys, json, time, glob, shutil, random, argparse, contextlib, multipro
 HOME = os.path.expanduser("~"); R610 = f"{HOME}/beacon/raid610"
 
 def venue_args(seed, venue, a):
-    if venue == "crown": rings, merit = "1568,4374,7244,10198,13500,17734,22818,31576", 45.0
-    else: rings, merit = "1568,4374,7244,10198,13500,17734,26542", 37.8241
+    import venue as _venue; _V = _venue.load()
+    if venue == "crown" and _V["name"] == "crown": rings, merit = "1568,4374,7244,10198,13500,17734,22818,31576", 45.0
+    elif venue == "raid": rings, merit = "1568,4374,7244,10198,13500,17734,26542", 37.8241
+    else: rings, merit = _V["rings"], float(_V["merit"])
     def kn(n, d):
         try: return open(f"{R610}/{n}.txt").read().strip() or d
         except OSError: return d
     deepq = int(kn("DEEPQ", "0")); deepr = int(kn("DEEPR", "1")); select = int(kn("SELECT", "1"))
-    return dict(zd=1439, swap=[2, 3, 5, 7, 11], kdig=13, merit=merit, Q=100000, deep_q=deepq, deep_from_ring=1, deep_rings=deepr,
-                select=select, rings=rings, bits=2048, seed=seed, kblock=20000, fast=2, max_prp=60000, bin=None, round=1)
+    return dict(zd=_V["zd"], swap=list(_V["swap"]), kdig=_V["kdig"], merit=merit, Q=100000, deep_q=deepq, deep_from_ring=1, deep_rings=deepr,
+                select=select, rings=rings, bits=_V["bits"], seed=seed, kblock=20000, fast=2, max_prp=60000, bin=None, round=1)
 
 # ---------------- workers: in-process scanhunt, cwd = the window's work dir ----------------
 _S = {}

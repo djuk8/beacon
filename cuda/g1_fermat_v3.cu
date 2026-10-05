@@ -38,9 +38,13 @@
 
    usage: g1_fermat cand.bin verdict.bin [--repeat N] [--inject IDX BDRY]
                                          [--device D]
+   v3.4 (2026-08-24, C): base-2 bitwise ladder -- window multiplies replaced by
+        AMM-safe modular doublings (Rn carry fold; verdicts byte-identical: every
+        equality already canonicalizes via cgbn_rem). Window table removed.
+        O4' defaults: --chunk 6 --growth 1.15 (10-wave DP optimum, O4_SCHEDULE_NOTE).
    v3.3 (2026-08-22, C): one allocation, bins read straight into instances; --lock PATH = flock held only around the GPU phase.
    v3.2: --bins list.txt (several bins, same bits, list order) for --ee; EARLY-EXIT MODE, legacy path untouched. (v3.0 schedule rounding bug fixed: rint)
-     g1_fermat cand.bin verdict.bin --ee sizes.bin [--chunk 8] [--growth 1.5] [--marker 3]
+     g1_fermat cand.bin verdict.bin --ee sizes.bin [--chunk 6] [--growth 1.15] [--marker 3]
      g1_fermat list.txt verdict.bin --bins --ee sizes.bin [--lock /tmp/raidgpuN.lock]   (list.txt: one bin path per line)
      sizes.bin: u32 magic 'G2S1' | u32 nk | nk * u32 sizes (per-k candidate counts,
      contiguous in cand.bin in the order to test = center-out).  Candidates go to the
@@ -101,6 +105,12 @@ struct f2_params_t {
   static const uint32_t GEC_C=64;    /* blocks per verification span        */
 };
 
+// 1024-bit class (measured 2026-09-25 on an idle RTX 5090: 1.90M tests/s vs 486k at 2048 bits; TPI 4 does not build with CGBN, LTPB 256 / window 5 was the best of the swept variants)
+template<> struct f2_params_t<8u,1024u> {
+  static const uint32_t TPB=0; static const uint32_t MAX_ROTATION=4; static const uint32_t SHM_LIMIT=0; static const bool CONSTANT_TIME=false;
+  static const uint32_t TPI=8; static const uint32_t BITS=1024; static const uint32_t LTPB=256u; static const uint32_t WINDOW_BITS=5u;
+  static const uint32_t GEC_J=8; static const uint32_t GEC_C=64; };
+
 template<class params>
 class fermat2_t {
   public:
@@ -141,39 +151,50 @@ class fermat2_t {
     }
   }
 
+  /* v3.4: multiply the AMM representative by 2. cgbn mont ops keep reps in
+     [0,2^BITS) (subtract-n on container carry only -- read core_mont_imad.cu
+     + impl_mpz.cc, both backends identical). add's container carry is folded
+     via 2^BITS === Rn (mod n); terminates in <=2 folds since Rn < n << 2^BITS. */
+  __device__ __forceinline__ void mont_dbl(bn_t &x, const bn_t &Rn) {
+    int32_t c=cgbn_add(_env, x, x, x);
+    while(c) c=cgbn_add(_env, x, x, Rn);
+  }
+
   /* base-2 Fermat with Gerbicz-Li spans; inject_boundary>=0 flips one bit
      of the ladder state mid-block at that boundary count (fault drill). */
   __device__ __forceinline__ uint32_t fermat_gec(const bn_t &n,
       int32_t inject_boundary) {
-    bn_t       x, t, E, A, B, y_prev, chk, pw, one_m, two_m;
-    bn_local_t window[1<<w];
+    bn_t       x, t, E, A, B, y_prev, chk, pw, one_m, two_m, Rn;
     int32_t    position, offset, injected=0;
     uint32_t   index, np0, chunk_in_blk=0, blk_in_span=0, boundary=0;
     uint64_t   Vblk=0, sumV=0;
 
     cgbn_sub_ui32(_env, E, n, 1);
 
-    /* window table of 2^i in Montgomery space; T[0] = R - n == 1~ (mod n) */
+    /* v3.4 base-2 bitwise ladder: no window table (frees (1<<w) bn_local_t
+       of local memory). one_m = R - n == 1~ (AMM rep); two_m = 2~ kept for
+       the mont_pow2 span verification. Rn = R mod n REDUCED -- the carry-fold
+       constant for mont_dbl. One cgbn_rem per candidate, amortized over
+       ~BITS squarings. */
     cgbn_negate(_env, t, n);
-    cgbn_store(_env, window+0, t);
     cgbn_set(_env, one_m, t);
+    cgbn_rem(_env, Rn, t, n);
     cgbn_set_ui32(_env, x, 2);
     np0=cgbn_bn2mont(_env, x, x, n);
-    cgbn_store(_env, window+1, x);
     cgbn_set(_env, two_m, x);
-    cgbn_set(_env, t, x);
-    #pragma nounroll
-    for(index=2;index<(1u<<w);index++) {
-      cgbn_mont_mul(_env, x, x, t, n, np0);
-      cgbn_store(_env, window+index, x);
-    }
 
     /* leading (possibly partial) chunk, exactly as sample_04 */
     position=params::BITS - cgbn_clz(_env, E);
     offset=position % w;
     position -= (offset==0) ? (int32_t)w : offset;
     index=cgbn_extract_bits_ui32(_env, E, position, w);
-    cgbn_load(_env, x, window+index);
+    /* x = 2^index~ by square-and-conditional-double from 1~ (value-identical
+       to the old window load; leading zeros of a partial chunk are no-ops) */
+    cgbn_set(_env, x, one_m);
+    for(uint32_t s=0;s<w;s++) {
+      cgbn_mont_sqr(_env, x, x, n, np0);
+      if((index>>(w-1u-s))&1u) mont_dbl(x, Rn);
+    }
 
     /* GEC state: span products start at 1~, first block parent is y_0 = x */
     cgbn_set(_env, y_prev, x);
@@ -181,13 +202,13 @@ class fermat2_t {
     cgbn_set(_env, B, one_m);
 
     while(position>0) {
-      #pragma nounroll
-      for(uint32_t s=0;s<w;s++)
-        cgbn_mont_sqr(_env, x, x, n, np0);
       position -= w;
       index=cgbn_extract_bits_ui32(_env, E, position, w);
-      cgbn_load(_env, t, window+index);
-      cgbn_mont_mul(_env, x, x, t, n, np0);
+      #pragma nounroll
+      for(uint32_t s=0;s<w;s++) {
+        cgbn_mont_sqr(_env, x, x, n, np0);
+        if((index>>(w-1u-s))&1u) mont_dbl(x, Rn);   /* == mul by 2^index after w sqrs */
+      }
       Vblk=(Vblk<<w)|index;
       chunk_in_blk++;
 
@@ -511,7 +532,7 @@ int main(int argc, char **argv) {
     return 2;
   }
   int repeat=1, inject_idx=-1, inject_boundary=-1, device=0;
-  const char *spath=NULL, *lockpath=NULL; int chunk=8, marker=3, islist=0; double growth=1.5;
+  const char *spath=NULL, *lockpath=NULL; int chunk=6, marker=3, islist=0; double growth=1.15;   /* v3.4: O4-prime 10-wave DP optimum */
   for(int i=3;i<argc;i++){
     if(!strcmp(argv[i],"--repeat")&&i+1<argc)      repeat=atoi(argv[++i]);
     else if(!strcmp(argv[i],"--ee")&&i+1<argc)     spath=argv[++i];
@@ -544,6 +565,7 @@ int main(int argc, char **argv) {
   if(spath){
     if(marker==0||marker==1||marker==2||marker>255){fprintf(stderr,"marker must be 3..255\n");return 2;}
     switch(h.bits){
+      case  1024: run_ee<f2_params_t< 8, 1024> >(argv[1],argv[2],spath,chunk,growth,marker,islist,lockpath); break;
       case  2048: run_ee<f2_params_t< 8, 2048> >(argv[1],argv[2],spath,chunk,growth,marker,islist,lockpath); break;
       case  4096: run_ee<f2_params_t<16, 4096> >(argv[1],argv[2],spath,chunk,growth,marker,islist,lockpath); break;
       case  8192: run_ee<f2_params_t<32, 8192> >(argv[1],argv[2],spath,chunk,growth,marker,islist,lockpath); break;
@@ -555,13 +577,14 @@ int main(int argc, char **argv) {
     return 0;
   }
   switch(h.bits){
+    case  1024: RUN<f2_params_t< 8, 1024> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case  2048: RUN<f2_params_t< 8, 2048> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case  4096: RUN<f2_params_t<16, 4096> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case  8192: RUN<f2_params_t<32, 8192> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case 16384: RUN<f2_params_t<32,16384> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case 24576: RUN<f2_params_t<32,24576> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
     case 32768: RUN<f2_params_t<32,32768> >(argv[1],argv[2],repeat,inject_idx,inject_boundary); break;
-    default: fprintf(stderr,"unsupported bits=%u (classes: 2048,4096,8192,"
+    default: fprintf(stderr,"unsupported bits=%u (classes: 1024,2048,4096,8192,"
                      "16384,24576,32768)\n",h.bits); return 2;
   }
   return 0;
