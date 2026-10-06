@@ -53,6 +53,15 @@
      the marker.  Verdict file byte-identical to ee_serve.py's (same schedule, same stop
      rule).  GEC in-ladder check unchanged.
 */
+/* v3.5/3.6 (2026-10-06): FERMAT_GEC 0 = no Gerbicz-Li check (+13%, verdicts identical; an hourly canary and the notary
+   replace it; build -DFERMAT_GEC=1 for the G2 fault-injection drill). DRIVER_SPIN 0 = blocking sync: the host thread sleeps
+   while the GPU works (99% -> 11% of a core per driver, same tests/s). */
+#ifndef DRIVER_SPIN
+#define DRIVER_SPIN 0
+#endif
+#ifndef FERMAT_GEC
+#define FERMAT_GEC 0
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -220,7 +229,7 @@ class fermat2_t {
         injected=1;
       }
 
-      if(chunk_in_blk==J) {                    /* block boundary */
+      if(FERMAT_GEC && chunk_in_blk==J) {      /* block boundary */
         cgbn_mont_mul(_env, A, A, y_prev, n, np0);
         cgbn_mont_mul(_env, B, B, x, n, np0);
         cgbn_set(_env, y_prev, x);
@@ -247,7 +256,7 @@ class fermat2_t {
       }
     }
 
-    if(blk_in_span>0) {                        /* final partial span */
+    if(FERMAT_GEC && blk_in_span>0) {          /* final partial span */
       cgbn_set(_env, chk, A);
       #pragma nounroll
       for(uint32_t s=0;s<w*J;s++)
@@ -547,6 +556,9 @@ int main(int argc, char **argv) {
   }
 #ifndef CPU_TEST
   cudaSetDevice(device);
+#if !DRIVER_SPIN
+  { cudaError_t fe = cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync); if (fe != cudaSuccess) fprintf(stderr, "warning: blocking sync not set: %s\n", cudaGetErrorString(fe)); }
+#endif
 #else
   (void)device;
 #endif

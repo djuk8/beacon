@@ -101,7 +101,7 @@ def main():
     done = load_ledger_ks(a.ledger)
     print(f"salvage v1: {len(mans)} manifests | dedup set {len(done):,} ks from {len(a.ledger)} ledger(s) | out -> {out} | jobs {a.jobs}", flush=True)
 
-    jobs, owner, acct = [], [], {"walked": 0, "already": 0, "empty": 0, "error": 0}
+    jobs, owner, dup, acct = [], [], [], {"walked": 0, "already": 0, "empty": 0, "error": 0}
     seen = set()
     for mf in mans:
         try: man = json.load(open(mf))
@@ -111,7 +111,7 @@ def main():
         ks = [int(k) for k in man.get("ks", [])]
         if not ks: print(f"{mf}: EMPTY ks -- left in place"); acct["empty"] += 1; continue
         pend = [k for k in ks if k not in done and k not in seen]
-        if not pend: acct["already"] += 1; continue
+        if not pend: acct["already"] += 1; dup.append(mf); continue          # v8.55: archive duplicates too
         for k in pend: seen.add(k); jobs.append((k, zd, d, a.span, rung)); owner.append(mf)
         acct["walked"] += 1
     print(f"accounting: walked {acct['walked']} | already-ledgered {acct['already']} | empty {acct['empty']} | error {acct['error']} | ks to walk {len(jobs)}", flush=True)
@@ -142,7 +142,7 @@ def main():
         f.flush(); os.fsync(f.fileno())
     if a.archive:
         os.makedirs(a.archive, exist_ok=True)
-        for mf in set(owner): os.replace(mf, os.path.join(a.archive, mf.replace("/", "__")))
+        for mf in set(owner) | set(dup): os.replace(mf, os.path.join(a.archive, mf.replace("/", "__")))
     good.sort(key=lambda r: -r[1])
     print(f"\ndone in {time.time()-t0:.0f}s: {len(good)} walked, {len(results)-len(good)} unresolved | best:")
     for gap, merit, k, jl, jr, rung in good[:8]: print(f"  {gap:>7} {merit:8.4f} k={k} jl={jl} jr={jr} r{rung}")

@@ -22,12 +22,15 @@ echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVES
 [ -d "$P3/CGBN" ] || git clone -q --depth 1 https://github.com/NVlabs/CGBN "$P3/CGBN" || die "git clone CGBN"
 [ -x "$P3/g1_fermat_v3" ] || { mkdir -p "$P3/cuda" && cp "$K/g1_fermat_v3.cu" "$P3/cuda/" && ( cd "$P3/cuda" && nvcc -O3 -arch=sm_$CC -I ../CGBN/include -o ../g1_fermat_v3 g1_fermat_v3.cu -lgmp 2>&1 | grep -iv warning | tail -3 ); }; [ -x "$P3/g1_fermat_v3" ] || die "g1_fermat_v3 build (nvcc sm_$CC, CGBN, -lgmp)"
 OUT=$("$P3/g1_fermat_v3" --help 2>&1 || true); echo "$OUT" | grep -q usage || die "g1_fermat_v3 does not run: $OUT"; say "driver built: $(sha256sum $P3/g1_fermat_v3 | cut -c1-12)"
+# 2b. canary (v8.55): 200 known primes + 200 composites at 2,029 bits; the production driver must reproduce the expected verdicts
+cp "$K/canary_2048.bin" "$K/canary_expected.bin" "$K/canary.sh" "$P3/" && chmod +x "$P3/canary.sh" || die "canary files missing from the kit"
+( cd "$P3" && ./g1_fermat_v3 canary_2048.bin /tmp/canary_v0.bin > /dev/null 2>&1 && cmp -s /tmp/canary_v0.bin canary_expected.bin ) || die "canary FAILED on card 0 - driver build or card is bad"; say "canary: driver reproduces the expected verdicts"
 # 3. seed knob, then go_crown does the rest: venue files, residue cache (~15 min), C/CUDA sieve builds, G-L2 gate, crontab, launch
 echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVESEED2.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))${SEED2:+, second sieve card seed $SEED2}; cards: $NG (above 4, cards 4-7 get their own sieve card)"
 cp "$K/venue.py" "$R/"; if [ "$VENUE" != crown ]; then [ -f "$K/venue$VENUE.json" ] || die "no venue file venue$VENUE.json in the kit"; cp "$K/venue$VENUE.json" "$R/VENUE.json"; fi
 read VBITS VLAD <<< "$(cd "$R" && PYTHONPATH="$R:$K" $PY -c "import venue; v=venue.load(); print(v['bits'], v['ladder'])")"; say "venue $VENUE (driver class $VBITS bits, ladder $VLAD)"
 [ -s "$R/$VLAD" ] || [ -f "$K/$VLAD" ] && cp "$K/$VLAD" "$R/" 2>/dev/null; [ -s "$R/$VLAD" ] || { say "designing the ladder for this venue (a minute or two)"; ( cd "$R" && PYTHONPATH="$R:$K" $PY "$K/ladder_crown.py" edges > ladder_design.log 2>&1 ); [ -s "$R/$VLAD" ] || die "ladder design failed (see $R/ladder_design.log)"; }
-[ "$LAUNCH" = 1 ] || { say "--no-launch: stopping before go_crown (run it yourself from $R: bash $K/go_crown.sh)"; exit 0; }
+[ "$LAUNCH" = 1 ] || { say "--no-launch: stopping before go_crown (run it yourself from $R: bash $K/go_crown.sh, then add the cron lines: harvest at :17, $P3/canary.sh at :43)"; exit 0; }
 cd "$R" && bash "$K/go_crown.sh" 2>&1 | tail -8
-( crontab -l 2>/dev/null; echo "17 * * * * $K/harvest_hourly.sh >> $R/harvest.log 2>&1" ) | sort -u | crontab -
-say "launched. In 20 minutes: bash $K/daily.sh  (fresh box ramps for ~1 h; healthy = ~11k w/s per RTX 5090, GPUs 100%, fallback 0)"
+( crontab -l 2>/dev/null; echo "17 * * * * $K/harvest_hourly.sh >> $R/harvest.log 2>&1"; echo "43 * * * * $P3/canary.sh" ) | sort -u | crontab -
+say "launched. In 20 minutes: bash $K/daily.sh  (fresh box ramps for ~1 h; healthy = ~12.5k w/s per RTX 5090 at 575 W, GPUs 100%, fallback 0)"

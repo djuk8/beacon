@@ -22,7 +22,7 @@ cp "$K/resonance_map.py" "$R/" 2>/dev/null; [ -f "$R/resonance_map.py" ] || { ec
 PYTHONPATH="$R:$K" $PY "$K/prewarm_cache.py" || exit 1
 cp "$K/raid_loop_v2.sh" "$R/raid_loop_v2.sh"; chmod +x "$R/raid_loop_v2.sh"; cp "$K/ladder.py" "$R/ladder.py"
 cp "$K/scanhunt_v0.py" "$K/fastmake.py" "$K/deep_primes.py" "$R/" && ( cd "$R" && gcc -O3 -shared -fPIC -o fastmake_c.so "$K/fastmake_c.c" ) || { echo "deep install failed"; exit 1; }
-cp $K/bsd.py $K/gbsd.py $K/bs_api.c $K/bsieve.c $K/gbs.cu ~/beacon/raid610/ && (cd ~/beacon/raid610 && gcc -O3 -shared -fPIC -o bs_api.so bs_api.c -lpthread && ([ -f gbs.so ] && [ gbs.so -nt gbs.cu ] || /usr/local/cuda/bin/nvcc -O3 -shared -Xcompiler -fPIC -gencode arch=compute_120,code=sm_120 -o gbs.so gbs.cu)) || { echo "bs_api.so build FAILED"; exit 1; }
+cp $K/bsd.py $K/gbsd.py $K/bs_api.c $K/bsieve.c $K/gbs.cu ~/beacon/raid610/ && (cd ~/beacon/raid610 && gcc -O3 -march=native -shared -fPIC -o bs_api.so bs_api.c -lpthread && ([ -f gbs.so ] && [ gbs.so -nt gbs.cu ] || /usr/local/cuda/bin/nvcc -O3 -shared -Xcompiler -fPIC -gencode arch=compute_120,code=sm_120 -o gbs.so gbs.cu)) || { echo "bs_api.so build FAILED"; exit 1; }
 echo "deep stack: scanhunt $(sha256sum $R/scanhunt_v0.py | cut -c1-12) fastmake $(sha256sum $R/fastmake.py | cut -c1-12) c.so $(sha256sum $R/fastmake_c.so | cut -c1-12)"
 cp "$K/ee_serve.py" "$P3/ee_serve.py"; cp "$K/onstart_raid_v2.sh" /root/onstart_raid_v2.sh; chmod +x /root/onstart_raid_v2.sh
 echo "installed: loop $(sha256sum $R/raid_loop_v2.sh | cut -c1-12) onstart $(sha256sum /root/onstart_raid_v2.sh | cut -c1-12) feeder $(sha256sum $P3/ee_serve.py | cut -c1-12)"

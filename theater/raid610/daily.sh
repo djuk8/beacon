@@ -21,7 +21,7 @@ for c in [d[1:] for d in sorted(os.listdir('queue')) if d.startswith('c')] if os
             elif r == 7: r7t[k] += d['ks']
             elif r == 8: r8t[k] += d['ks']
 land = collections.Counter()
-for mf in glob.glob('walked/**/sc_r07_*.manifest.json', recursive=True) + glob.glob('hunt_s1*/sc_r07_*.manifest.json'):
+for mf in glob.glob('walked/**/*sc_r07_*.manifest.json', recursive=True) + glob.glob('hunt_s*/sc_r07_*.manifest.json'):
     age = now - os.path.getmtime(mf)
     if age < H * 3600:
         try: land[int(age // S)] += len(json.load(open(mf))['ks'])
@@ -41,4 +41,4 @@ echo "all-time top:"; sort -k2 -gr campaign_ledger.log 2>/dev/null | head -3 | a
 /venv/main/bin/python3 /root/beacon/p3/o1_kit/claimcheck_v1.py campaign_ledger.log arbitrage_map_v0.csv 2>/dev/null | sed -n 2p
 echo "--- box ---"; echo "load $(cut -d' ' -f1-3 /proc/loadavg) | gpu $(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | tr '\n' ' ')| managers $(pgrep -fc 'ladder.py --card') feeders $(pgrep -fc '^/venv/main/bin/python3 /root/beacon/p3/ee_serve.py') sieve $(pgrep -fc '[g]bsd.py --seed') ready $(ls /dev/shm/ready/c*/*.manifest.json 2>/dev/null | wc -l) fallback $(cat fallback_c*.log 2>/dev/null | wc -l)"
 echo "relaunches in window: $(find . -maxdepth 1 -name '*.launch.log' -mmin -$((H*60)) -exec grep -c 'WATCHDOG RELAUNCH' {} + 2>/dev/null | awk -F: '{s+=$2} END{print s+0}') | daemon resumes: $(grep -c 'resuming seed' gbsd_sieve.log 2>/dev/null) | root free $(df -h / | awk 'NR==2{print $4}') shm free $(df -h /dev/shm | awk 'NR==2{print $4}')"
-grep -h "LADDER ERROR\|FAIL" hunt_s1*.log 2>/dev/null | grep -v "FOSSIL COPY" | tail -2 | cut -c1-120
+grep -h "LADDER ERROR\|FAIL" hunt_s*.log 2>/dev/null | grep -v "FOSSIL COPY" | tail -2 | cut -c1-120
