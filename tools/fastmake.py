@@ -30,6 +30,11 @@ if os.environ.get("FASTMAKE_IMPL", "c") != "numpy":
 if _lib is None:
     from fastmake_numpy import block_js as _np_block_js
 
+def _single_class(ks):
+    """v8.56: True for a set of ks in ONE residue class mod 2310 (single-class daemon rings, k = k0 + 2310 t). fm_block_js2 / fm_deepen
+    index rows over the odd-k span (1,155 rows per window for such a set: ~500x the work) -> the per-k kernel (same survivors: the contract)."""
+    return len(ks) >= 2 and bool(np.all(np.asarray(ks, dtype=np.int64) % 2310 == int(ks[0]) % 2310))
+
 def block_js(ks, prs, PEm, lo, hi, qd=None, PEd=None):
     if _lib is None:
         assert qd is None, "O3 deepening requires the C kernel (no numpy fallback by design -- venue consistency)"
@@ -38,7 +43,7 @@ def block_js(ks, prs, PEm, lo, hi, qd=None, PEd=None):
     PEm = np.ascontiguousarray(np.asarray(PEm, dtype=np.int64)); nk = len(ks)
     cap = int(nk * ((int(hi) - int(lo)) // 2 + 2) * 2 + 16)
     out = np.empty(cap, dtype=np.int32); cnt = np.empty(max(nk, 1), dtype=np.int32)
-    _use2 = (nk >= 500) and (__import__("os").environ.get("FM_JS2", "1") != "0")   # prime-outer bitmap sieve for rung-1 blocks. (v7.7 density guard REMOVED -- it silently forced the slow per-k path in production: 41.9k->30k, bisected 2026-09-06. js2 handles selected sparse sets fine; the walk cost is landing-proportional, not span-proportional.)
+    _use2 = (nk >= 500) and (__import__("os").environ.get("FM_JS2", "1") != "0") and not _single_class(ks)   # prime-outer bitmap sieve for rung-1 blocks. (v7.7 density guard REMOVED -- it silently forced the slow per-k path in production: 41.9k->30k, bisected 2026-09-06. js2 handles selected sparse sets fine; the walk cost is landing-proportional, not span-proportional.)
     if _use2:
         prs64 = np.ascontiguousarray(np.asarray(prs, dtype=np.int64)); PEm64 = np.ascontiguousarray(np.asarray(PEm, dtype=np.int64))
         tot = _lib.fm_block_js2(ks.ctypes.data, nk, prs64.ctypes.data, PEm64.ctypes.data, len(prs64), int(lo), int(hi), out.ctypes.data, cnt.ctypes.data, cap)
@@ -46,6 +51,7 @@ def block_js(ks, prs, PEm, lo, hi, qd=None, PEd=None):
         tot = _lib.fm_block_js(ks.ctypes.data, nk, prs.ctypes.data, PEm.ctypes.data, len(prs), int(lo), int(hi), out.ctypes.data, cnt.ctypes.data, cap)
     if tot < 0: raise RuntimeError(f"fastmake_c returned {tot}")
     if qd is not None:
+        if _single_class(ks): raise RuntimeError("v8.56: deepening a single-class set (DEEPR > 1) is not supported - keep DEEPR=1")
         qd = np.ascontiguousarray(np.asarray(qd, dtype=np.int64)); PEd = np.ascontiguousarray(np.asarray(PEd, dtype=np.int64))
         offs_pre = np.zeros(nk, dtype=np.int64); np.cumsum(cnt[:-1], out=offs_pre[1:])   # PHYSICAL segment starts (pre-deepen layout)
         kd = _lib.fm_deepen(ks.ctypes.data, nk, out.ctypes.data, cnt.ctypes.data, qd.ctypes.data, PEd.ctypes.data, len(qd), int(lo), int(hi))
@@ -59,7 +65,7 @@ def _raw(ks, prs, PEm, lo, hi, qd=None, PEd=None):
     PEm = np.ascontiguousarray(np.asarray(PEm, dtype=np.int64)); nk = len(ks)
     cap = int(nk * ((int(hi) - int(lo)) // 2 + 2) * 2 + 16)
     out = np.empty(cap, dtype=np.int32); cnt = np.empty(max(nk, 1), dtype=np.int32)
-    _use2 = (nk >= 500) and (__import__("os").environ.get("FM_JS2", "1") != "0")   # prime-outer bitmap sieve for rung-1 blocks. (v7.7 density guard REMOVED -- it silently forced the slow per-k path in production: 41.9k->30k, bisected 2026-09-06. js2 handles selected sparse sets fine; the walk cost is landing-proportional, not span-proportional.)
+    _use2 = (nk >= 500) and (__import__("os").environ.get("FM_JS2", "1") != "0") and not _single_class(ks)   # prime-outer bitmap sieve for rung-1 blocks. (v7.7 density guard REMOVED -- it silently forced the slow per-k path in production: 41.9k->30k, bisected 2026-09-06. js2 handles selected sparse sets fine; the walk cost is landing-proportional, not span-proportional.)
     if _use2:
         prs64 = np.ascontiguousarray(np.asarray(prs, dtype=np.int64)); PEm64 = np.ascontiguousarray(np.asarray(PEm, dtype=np.int64))
         tot = _lib.fm_block_js2(ks.ctypes.data, nk, prs64.ctypes.data, PEm64.ctypes.data, len(prs64), int(lo), int(hi), out.ctypes.data, cnt.ctypes.data, cap)
@@ -67,6 +73,7 @@ def _raw(ks, prs, PEm, lo, hi, qd=None, PEd=None):
         tot = _lib.fm_block_js(ks.ctypes.data, nk, prs.ctypes.data, PEm.ctypes.data, len(prs), int(lo), int(hi), out.ctypes.data, cnt.ctypes.data, cap)
     if tot < 0: raise RuntimeError(f"fastmake_c returned {tot}")
     if qd is not None:
+        if _single_class(ks): raise RuntimeError("v8.56: deepening a single-class set (DEEPR > 1) is not supported - keep DEEPR=1")
         qd = np.ascontiguousarray(np.asarray(qd, dtype=np.int64)); PEd = np.ascontiguousarray(np.asarray(PEd, dtype=np.int64))
         offs_pre = np.zeros(nk, dtype=np.int64); np.cumsum(cnt[:-1], out=offs_pre[1:])   # PHYSICAL segment starts (pre-deepen layout)
         kd = _lib.fm_deepen(ks.ctypes.data, nk, out.ctypes.data, cnt.ctypes.data, qd.ctypes.data, PEd.ctypes.data, len(qd), int(lo), int(hi))

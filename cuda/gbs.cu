@@ -23,6 +23,7 @@ typedef struct {
     /* small-prime masks */ int nsm; int64_t *d_sp, *d_spe, *d_spc; uint64_t *d_mask; int64_t *d_moff; /* mask offset per prime (words) */
     /* medium primes */ int64_t nmed; int64_t *d_mp, *d_mtc, *d_mstep; /* tc, step per prime (js2 constants) */
     uint64_t *d_wheel;                                              /* wheel template for wheel primes in the medium table */
+    int64_t S;                                                      /* v8.56: progression step, k = k0 + S*t (2 = every odd k; 2310 = one class) */
 } gbs_t;
 
 #define CK(x) do { cudaError_t e = (x); if (e != cudaSuccess) { fprintf(stderr, "CUDA %s @%d: %s\n", #x, __LINE__, cudaGetErrorString(e)); return -1; } } while (0)
@@ -31,14 +32,14 @@ __device__ __forceinline__ int coprime2310(int64_t k) { return (k % 3) && (k % 5
 
 /* K_A: row init + wheel + small-prime masks */
 __global__ void k_rows(int64_t T, int64_t I, int64_t Sh, int64_t BW, int64_t k0, int64_t tbase, uint64_t *bits,
-                       int nsm, const int64_t *sp, const int64_t *spe, const int64_t *spc, const uint64_t *mask, const int64_t *moff, const uint64_t *wheel) {
+                       int nsm, const int64_t *sp, const int64_t *spe, const int64_t *spc, const uint64_t *mask, const int64_t *moff, const uint64_t *wheel, int64_t S) {
     int64_t row = blockIdx.x * (int64_t)blockDim.x + threadIdx.x; if (row >= T) return;
-    uint64_t *w = bits + row * BW; int64_t t = tbase + row; int64_t k = k0 + 2 * t;
+    uint64_t *w = bits + row * BW; int64_t t = tbase + row; int64_t k = k0 + S * t;
     if (!coprime2310(k)) { for (int64_t x = 0; x < BW; x++) w[x] = 0; return; }
     for (int64_t x = 0; x < BW; x++) w[x] = wheel[x];                                     /* alive except j=0 and wheel primes' j==0 mod p */
     for (int q = 0; q < nsm; q++) {
         int64_t p = sp[q], e = spe[q]; if (p == 2) continue; int64_t r;
-        if ((2 * e) % p == 0) r = Sh % p; else { r = (spc[q] - (t % p) * e) % p; if (r < 0) r += p; }
+        if ((2 * e) % p == 0) r = Sh % p; else { int64_t f = (S == 2) ? e : ((S / 2) % p) * e % p; r = (spc[q] - (t % p) * f) % p; if (r < 0) r += p; }   /* v8.56: row shift (S/2)*pe; 0 for 3,5,7,11 at S = 2310 (same kill every row) */
         const uint64_t *mk = mask + moff[q] + r * BW;
         for (int64_t x = 0; x < BW; x++) w[x] &= ~mk[x];
     }
@@ -74,7 +75,7 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
                  int nsm, const int64_t *sp, const int64_t *spe, const int64_t *spc, const uint64_t *mask, const int64_t *moff, int64_t mask_words,
                  int64_t nmed, const int64_t *mp, const int64_t *mtc, const int64_t *mstep, const uint64_t *wheel) {
     if (cudaSetDevice(dev) != cudaSuccess) return NULL;
-    gbs_t *G = (gbs_t *)calloc(1, sizeof *G); G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed;
+    gbs_t *G = (gbs_t *)calloc(1, sizeof *G); G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed; G->S = 2;
     #define UP(dst, src, n, ty) do { if (cudaMalloc((void **)&(dst), (size_t)(n) * sizeof(ty)) != cudaSuccess) return NULL; if (cudaMemcpy((dst), (src), (size_t)(n) * sizeof(ty), cudaMemcpyHostToDevice) != cudaSuccess) return NULL; } while (0)
     UP(G->d_rec, records, nrec, rec_t);
     if (cudaMalloc((void **)&G->d_bits, (size_t)T * G->BW * 8) != cudaSuccess) return NULL;
@@ -86,7 +87,7 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
 /* process the current block (advance cur), download the bitmap (T*BW words) into host_bits */
 int gbs_block(void *g, uint64_t *host_bits) {
     gbs_t *G = (gbs_t *)g; int64_t tbase = G->cur * G->T;
-    k_rows<<<(unsigned)((G->T + 255) / 256), 256>>>(G->T, G->I, G->Sh, G->BW, G->k0, tbase, G->d_bits, G->nsm, G->d_sp, G->d_spe, G->d_spc, G->d_mask, G->d_moff, G->d_wheel);
+    k_rows<<<(unsigned)((G->T + 255) / 256), 256>>>(G->T, G->I, G->Sh, G->BW, G->k0, tbase, G->d_bits, G->nsm, G->d_sp, G->d_spe, G->d_spc, G->d_mask, G->d_moff, G->d_wheel, G->S);
     CK(cudaGetLastError());
     int64_t nb = G->nmed * G->I; k_medium<<<(unsigned)((nb + 255) / 256), 256>>>(G->T, G->I, G->BW, G->k0, tbase, G->d_bits, G->nmed, G->d_mp, G->d_mtc, G->d_mstep);
     CK(cudaGetLastError());
@@ -96,5 +97,7 @@ int gbs_block(void *g, uint64_t *host_bits) {
     G->cur++; return 0;
 }
 int64_t gbs_cur(void *g) { return ((gbs_t *)g)->cur; }
+/* v8.56: progression step, set once after gbs_create and before the first block; the host constants must be built for the same S */
+int gbs_set_step(void *g, int64_t S) { gbs_t *G = (gbs_t *)g; if (S < 2 || (S & 1)) return -1; if (G->cur) return -2; G->S = S; return 0; }
 void gbs_sync(void) { cudaDeviceSynchronize(); }
 }

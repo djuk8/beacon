@@ -147,13 +147,14 @@ void bs_rows_init(const int32_t *rows, int64_t nk, int64_t lo, int64_t hi, uint6
 
 /* ---------------- exports for the GPU sieve (gbs.cu): all per-prime arithmetic stays here, on the certified code ---------------- */
 /* flat records (bsieve.c v2 init without buckets): returns count written (primes with a landing); out must hold nq records */
-int64_t bs_records_flat(const int64_t *qd, const int64_t *PEd, int64_t nq, int64_t k0, int64_t T, int64_t hi, rec_t *out) {
+int64_t bs_records_flat_s(const int64_t *qd, const int64_t *PEd, int64_t nq, int64_t k0, int64_t T, int64_t hi, int64_t S, rec_t *out) {   /* v8.56: rows k = k0 + S*t */
     int64_t Sh = hi / 2, I = 2 * Sh + 1, n = 0;
     for (int64_t q = 0; q < nq; q++) {
         uint64_t p = (uint64_t)qd[q], pe = (uint64_t)PEd[q] % p; uint64_t B = (2 * pe) % p; if (!B) continue;
         uint64_t inv2 = (p + 1) / 2, k0m = (uint64_t)(k0 % (int64_t)p);
         uint64_t i0 = (uint64_t)(((uint64_t)Sh % p + p - mulmod(mulmod(k0m, pe, p), inv2, p)) % p);
-        uint64_t sp = p - pe;
+        uint64_t f = (S == 2) ? pe : mulmod((uint64_t)(S / 2) % p, pe, p); if (!f) return -1;   /* v8.56: per-row shift (S/2)*pe; 0 = same kill every row (p | S/2): never for deep primes */
+        uint64_t sp = p - f;
         int64_t t = fm_next_hit((int64_t)sp, (int64_t)p, (int64_t)i0, I, 0, (int64_t)p); if (t < 0) continue;
         int32_t i = (int32_t)((i0 + (__uint128_t)(uint64_t)t * sp) % p);
         int32_t a0, b0; int64_t a1, b1; fk_reduce((int64_t)p, (int64_t)sp, I, &a0, &a1, &b0, &b1);
@@ -161,19 +162,24 @@ int64_t bs_records_flat(const int64_t *qd, const int64_t *PEd, int64_t nq, int64
     }
     return n;
 }
+int64_t bs_records_flat(const int64_t *qd, const int64_t *PEd, int64_t nq, int64_t k0, int64_t T, int64_t hi, rec_t *out) { return bs_records_flat_s(qd, PEd, nq, k0, T, hi, 2, out); }
 /* js2 constants for medium primes: tc, step per prime (same formulas as fm_block_js2) */
-void bs_js2_consts(int64_t k0, const int64_t *prs, const int64_t *PEm, int64_t np, int64_t hi, int64_t *tc_out, int64_t *step_out) {
-    int64_t Sh = hi / 2;
+int64_t bs_js2_consts_s(int64_t k0, const int64_t *prs, const int64_t *PEm, int64_t np, int64_t hi, int64_t S, int64_t *tc_out, int64_t *step_out) {   /* v8.56: rows k = k0 + S*t; returns #constant-kill primes (must be 0) */
+    int64_t Sh = hi / 2, nconst = 0;
     for (int64_t qi = 0; qi < np; qi++) {
         uint64_t p = (uint64_t)prs[qi], pe = (uint64_t)PEm[qi] % p, B = (2 * pe) % p;
         if (p == 2 || !B) { tc_out[qi] = -1; step_out[qi] = 0; continue; }
         uint64_t inv2 = (p + 1) / 2, k0m = (uint64_t)(k0 % (int64_t)p);
         uint64_t A = (p - (uint64_t)(((__uint128_t)k0m * pe) % p)) % p;
         uint64_t A2 = (uint64_t)(((__uint128_t)A * inv2) % p), B2 = (uint64_t)(((__uint128_t)B * inv2) % p);
+        if (S != 2) B2 = mulmod((uint64_t)(S / 2) % p, pe, p);                                  /* v8.56: per-row shift (S/2)*pe (== B*inv2 at S = 2) */
+        if (!B2) { tc_out[qi] = -1; step_out[qi] = 0; nconst++; continue; }                     /* p | S/2: the same kill in every row - not a walk */
         uint64_t c = fm_inv(B2, p);
         tc_out[qi] = (int64_t)(((__uint128_t)c * ((A2 + (uint64_t)Sh) % p)) % p); step_out[qi] = (int64_t)(p - c);
     }
+    return nconst;
 }
+void bs_js2_consts(int64_t k0, const int64_t *prs, const int64_t *PEm, int64_t np, int64_t hi, int64_t *tc_out, int64_t *step_out) { bs_js2_consts_s(k0, prs, PEm, np, hi, 2, tc_out, step_out); }
 /* wheel template for a prime table: alive bits (|j| > lo, j != 0) minus j == 0 (mod p) for every wheel prime (p | P_eff) in the table */
 void bs_wheel(const int64_t *prs, const int64_t *PEm, int64_t np, int64_t lo, int64_t hi, uint64_t *out) {
     int64_t Sh = hi / 2, I = 2 * Sh + 1; size_t BW = (size_t)((I + 63) / 64); memset(out, 0, BW * 8);
@@ -216,7 +222,7 @@ void *bs_pred_create(const int64_t *prs, const int64_t *PEm, int64_t nprs, const
 }
 /* pred for a contiguous progression k = k0 + 2t, t in [0,T): incremental residues, one add per (prime, t). threads: split primes. */
 #include <pthread.h>
-typedef struct { pred_t *M; int64_t k0, T, q0, q1; double *out; } pjob_t;
+typedef struct { pred_t *M; int64_t k0, T, q0, q1; double *out; int64_t S; } pjob_t;   /* v8.56: S = progression step */
 #include <string.h>
 static void *pred_run(void *arg) {   /* v2 (2026-10-06): periodic table per prime + periodic add; identical sums, ~5.5x less work */
     pjob_t *J = arg; pred_t *M = J->M; int64_t T = J->T;
@@ -225,7 +231,7 @@ static void *pred_run(void *arg) {   /* v2 (2026-10-06): periodic table per prim
     uint16_t *d = malloc((size_t)(pmax + 512) * sizeof(uint16_t));
     for (int64_t q = J->q0; q < J->q1; q++) {
         int64_t p = M->p[q], e = M->pe[q]; const uint16_t *c = M->tab + M->off[q];
-        int64_t r = (p - ((J->k0 % p) * e) % p) % p, step = (p - (2 * e) % p) % p;
+        int64_t r = (p - ((J->k0 % p) * e) % p) % p, step = (J->S == 2) ? (p - (2 * e) % p) % p : (p - ((J->S % p) * e) % p) % p;   /* v8.56: k = k0 + S*t */
         {   int64_t s8 = (8 * step) % p, rr[8]; rr[0] = r; for (int i = 1; i < 8; i++) { rr[i] = rr[i - 1] + step; if (rr[i] >= p) rr[i] -= p; }
             int64_t u = 0;
             for (; u + 8 <= p; u += 8) for (int i = 0; i < 8; i++) { d[u + i] = c[rr[i]]; rr[i] += s8; if (rr[i] >= p) rr[i] -= p; }
@@ -236,12 +242,13 @@ static void *pred_run(void *arg) {   /* v2 (2026-10-06): periodic table per prim
     }
     free(d); double *out = malloc((size_t)T * sizeof(double)); for (int64_t t = 0; t < T; t++) out[t] = acc[t]; free(acc); J->out = out; return NULL;
 }
-void bs_predict(void *m, int64_t k0, int64_t T, int nthreads, double *out) {
+void bs_predict_s(void *m, int64_t k0, int64_t T, int64_t S, int nthreads, double *out) {   /* v8.56: pred for k = k0 + S*t, t in [0,T) */
     pred_t *M = m; if (nthreads < 1) nthreads = 1; if (nthreads > 32) nthreads = 32; pthread_t th[32]; pjob_t jb[32];
-    for (int r = 0; r < nthreads; r++) { jb[r].M = M; jb[r].k0 = k0; jb[r].T = T; jb[r].q0 = M->np * r / nthreads; jb[r].q1 = M->np * (r + 1) / nthreads; pthread_create(&th[r], NULL, pred_run, &jb[r]); }
+    for (int r = 0; r < nthreads; r++) { jb[r].M = M; jb[r].k0 = k0; jb[r].T = T; jb[r].S = S; jb[r].q0 = M->np * r / nthreads; jb[r].q1 = M->np * (r + 1) / nthreads; pthread_create(&th[r], NULL, pred_run, &jb[r]); }
     for (int64_t t = 0; t < T; t++) out[t] = 0;
     for (int r = 0; r < nthreads; r++) { pthread_join(th[r], NULL); for (int64_t t = 0; t < T; t++) out[t] += jb[r].out[t]; free(jb[r].out); }
 }
+void bs_predict(void *m, int64_t k0, int64_t T, int nthreads, double *out) { bs_predict_s(m, k0, T, 2, nthreads, out); }
 /* constructor from caller-owned (memory-mapped, shared) arrays: p, pe, off (int64, np entries), tab (uint16, words entries) */
 void *bs_pred_attach(const int64_t *p, const int64_t *pe, const int64_t *off, const uint16_t *tab, int64_t np, int64_t hi) {
     pred_t *M = calloc(1, sizeof *M); M->np = np; M->hi = hi; M->p = (int64_t *)p; M->pe = (int64_t *)pe; M->off = (int64_t *)off; M->tab = (uint16_t *)tab; return M;
@@ -249,3 +256,5 @@ void *bs_pred_attach(const int64_t *p, const int64_t *pe, const int64_t *off, co
 void bs_pred_export(void *m, int64_t *p, int64_t *pe, int64_t *off, uint16_t *tab, int64_t words) {
     pred_t *M = m; memcpy(p, M->p, 8 * (size_t)M->np); memcpy(pe, M->pe, 8 * (size_t)M->np); memcpy(off, M->off, 8 * (size_t)M->np); memcpy(tab, M->tab, 2 * (size_t)words);
 }
+/* v8.56: library tag (receipts) */
+const char *bs_api_version(void) { return "bs_api v8.56 (step-aware: S = 2 | 2310)"; }
