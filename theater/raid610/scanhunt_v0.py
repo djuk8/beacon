@@ -248,7 +248,15 @@ def cmd_make(a):
         # v0.1 C path: sieve + center-out stable order + packing in fastmake_c; byte-identical to the loop below
         dq_on = bool(sv.dq) and r <= int(getattr(a, "deep_rings", 1))   # --deep-rings N: deepen rungs 1..N (FK walk makes annulus deepening per-prime cheap; v8.4)
         nsel_ = int(getattr(a, "select", 1))
-        if r == 1 and nsel_ > 1:                                          # SPARSE-WINDOW SELECTION (SELECT_PREREG: x1.33 pass, rung-independent)
+        r2c = carry.get("r2") if r >= 2 else None                         # v8.57: this ring was already sieved by the GPU daemon (to its depth)
+        if r2c is not None and (int(r2c["lo"]), int(r2c["hi"])) == (lo, hi) and len(r2c["cnt"]) == len(ks):
+            import base64
+            allj = np.frombuffer(base64.b64decode(r2c["b64"]), dtype="<i2").astype(np.int64); off = np.concatenate([[0], np.cumsum(r2c["cnt"])]).astype(np.int64)
+            assert off[-1] == len(allj), "r2 carry payload corrupt -- FATAL"
+            pjs, psizes, packed = fastmake.pack_given(ks, [allj[off[i]:off[i + 1]] for i in range(len(ks))], int(P_eff), nb)
+            sizes = list(psizes); blobs = [(k, j.tolist(), None) for k, j in zip(ks, pjs)]
+            print(f"make r{r}: ring from the GPU daemon's sieve (q {float(r2c['q']):.0e}): {len(ks):,} ks, mean {sum(sizes)/max(len(sizes),1):.1f}/k", flush=True)
+        elif r == 1 and nsel_ > 1:                                        # SPARSE-WINDOW SELECTION (SELECT_PREREG: x1.33 pass, rung-independent)
             _ks, pjs, psizes = fastmake.block_sieve(np.array(ks, dtype=np.int64), sv.prs, sv.PEm, lo, hi,
                                                      qd=sv.qd if dq_on else None, PEd=sv.PEd64 if dq_on else None)   # sieve the pool, pack only the keepers
             keep = sorted(sorted(range(len(ks)), key=lambda i: psizes[i])[:len(ks) // nsel_])
@@ -329,15 +337,23 @@ def cmd_fold(a):
         sys.exit("UNTOUCHED 0xFF verdicts -- FATAL")
     pos = 0
     surv_ks = []
+    surv_ix = []
     prp_tot = 0
-    for k, js, sz in zip(man["ks"], man["js"], man["sizes"]):
+    for ix, (k, js, sz) in enumerate(zip(man["ks"], man["js"], man["sizes"])):
         vl = v[pos:pos + sz]; pos += sz
         hits = [js[i] for i in range(sz) if vl[i] in (1, 2)]
         prp_tot += len(hits)
         if not hits:
-            surv_ks.append(k)
-    json.dump(dict(ks=surv_ks, bid=man["bid"], round=r),
-              open(f"sc_carry_r{r:02d}.json", "w"))
+            surv_ks.append(k); surv_ix.append(ix)
+    carry = dict(ks=surv_ks, bid=man["bid"], round=r)
+    if r == 1 and "r2" in man:     # v8.57: the GPU daemon's ring-2 survivors (sieved to its depth) ride along for the windows that advance
+        import base64
+        R2 = man["r2"]; cnt2 = [int(c) for c in R2["cnt"]]; allj = np.frombuffer(base64.b64decode(R2["b64"]), dtype="<i2")
+        assert len(cnt2) == len(man["ks"]) and sum(cnt2) == len(allj), "r2 payload does not match the manifest -- FATAL"
+        off = np.concatenate([[0], np.cumsum(cnt2)]).astype(np.int64); sel = [allj[off[i]:off[i + 1]] for i in surv_ix]
+        carry["r2"] = dict(lo=R2["lo"], hi=R2["hi"], q=R2["q"], cnt=[int(len(x)) for x in sel],
+                           b64=base64.b64encode(np.concatenate(sel).astype("<i2").tobytes() if sel else b"").decode("ascii"))
+    json.dump(carry, open(f"sc_carry_r{r:02d}.json", "w"))
     nk = len(man["ks"])
     print(f"round {r}: {nk} ks -> {len(surv_ks)} advance "
           f"(pass rate {len(surv_ks)/max(nk,1):.4f}; ring E_meas "

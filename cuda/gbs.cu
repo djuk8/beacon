@@ -24,6 +24,7 @@ typedef struct {
     /* medium primes */ int64_t nmed; int64_t *d_mp, *d_mtc, *d_mstep; /* tc, step per prime (js2 constants) */
     uint64_t *d_wheel;                                              /* wheel template for wheel primes in the medium table */
     int64_t S;                                                      /* v8.56: progression step, k = k0 + S*t (2 = every odd k; 2310 = one class) */
+    int wide;                                                       /* v8.57: record layout, 0 = bsieve.c v2 (I <= 2047), 1 = wide (I <= 8191) */
 } gbs_t;
 
 #define CK(x) do { cudaError_t e = (x); if (e != cudaSuccess) { fprintf(stderr, "CUDA %s @%d: %s\n", #x, __LINE__, cudaGetErrorString(e)); return -1; } } while (0)
@@ -52,10 +53,10 @@ __global__ void k_medium(int64_t T, int64_t I, int64_t BW, int64_t k0, int64_t t
     for (int64_t tt = x; tt < T; tt += p) { atomicAnd((unsigned long long *)(bits + tt * BW + (i >> 6)), ~(1ULL << (i & 63))); }
 }
 /* K_C: deep primes, one thread per record */
-__global__ void k_deep(int64_t T, int64_t I, int64_t BW, int64_t tbase, uint64_t *bits, int64_t nrec, rec_t *rec) {
+__global__ void k_deep(int64_t T, int64_t I, int64_t BW, int64_t tbase, uint64_t *bits, int64_t nrec, rec_t *rec, int wide) {
     int64_t q = blockIdx.x * (int64_t)blockDim.x + threadIdx.x; if (q >= nrec) return;
     rec_t r = rec[q]; int64_t lim = tbase + T; int64_t t = R_T(r); if (t >= lim) return;
-    int64_t x = R_I(r); int32_t a0 = R_A0(r), b0 = R_B0(r); int64_t a1 = R_A1(r); int64_t p = (int64_t)R_P(r);
+    int64_t x = wide ? (int64_t)((r.w0 >> 36) & 8191) : R_I(r); int32_t a0 = wide ? (int32_t)((r.w0 >> 49) & 16383) - 8192 : R_A0(r), b0 = wide ? (int32_t)((r.w1 >> 44) & 8191) : R_B0(r); int64_t a1 = R_A1(r); int64_t p = (int64_t)R_P(r);   /* v8.57: wide layout when set */
     int64_t b1 = (a1 * (int64_t)b0 - p) / a0;                                              /* exact: a0*b1 - a1*b0 = -p */
     while (t < lim) {
         atomicAnd((unsigned long long *)(bits + (t - tbase) * BW + (x >> 6)), ~(1ULL << (x & 63)));
@@ -63,7 +64,7 @@ __global__ void k_deep(int64_t T, int64_t I, int64_t BW, int64_t tbase, uint64_t
         else if (x < I - b0)     { x += b0;      t += b1; }
         else                     { x += a0 + b0; t += a1 + b1; }
     }
-    r.w0 = (r.w0 & ~(2047ULL << 36)) | ((uint64_t)(uint32_t)x << 36);
+    r.w0 = (r.w0 & ~((wide ? 8191ULL : 2047ULL) << 36)) | ((uint64_t)(uint32_t)x << 36);
     r.w1 = (r.w1 & ~((1ULL << 44) - 1)) | (uint64_t)t;
     rec[q] = r;
 }
@@ -75,7 +76,7 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
                  int nsm, const int64_t *sp, const int64_t *spe, const int64_t *spc, const uint64_t *mask, const int64_t *moff, int64_t mask_words,
                  int64_t nmed, const int64_t *mp, const int64_t *mtc, const int64_t *mstep, const uint64_t *wheel) {
     if (cudaSetDevice(dev) != cudaSuccess) return NULL;
-    gbs_t *G = (gbs_t *)calloc(1, sizeof *G); G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed; G->S = 2;
+    gbs_t *G = (gbs_t *)calloc(1, sizeof *G); G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed; G->S = 2; G->wide = 0;
     #define UP(dst, src, n, ty) do { if (cudaMalloc((void **)&(dst), (size_t)(n) * sizeof(ty)) != cudaSuccess) return NULL; if (cudaMemcpy((dst), (src), (size_t)(n) * sizeof(ty), cudaMemcpyHostToDevice) != cudaSuccess) return NULL; } while (0)
     UP(G->d_rec, records, nrec, rec_t);
     if (cudaMalloc((void **)&G->d_bits, (size_t)T * G->BW * 8) != cudaSuccess) return NULL;
@@ -87,11 +88,12 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
 /* process the current block (advance cur), download the bitmap (T*BW words) into host_bits */
 int gbs_block(void *g, uint64_t *host_bits) {
     gbs_t *G = (gbs_t *)g; int64_t tbase = G->cur * G->T;
+    if (!G->wide && G->I > 2047) { fprintf(stderr, "gbs: I %ld needs the wide record layout (gbs_set_format)\n", (long)G->I); return -1; }   /* v8.57 */
     k_rows<<<(unsigned)((G->T + 255) / 256), 256>>>(G->T, G->I, G->Sh, G->BW, G->k0, tbase, G->d_bits, G->nsm, G->d_sp, G->d_spe, G->d_spc, G->d_mask, G->d_moff, G->d_wheel, G->S);
     CK(cudaGetLastError());
     int64_t nb = G->nmed * G->I; k_medium<<<(unsigned)((nb + 255) / 256), 256>>>(G->T, G->I, G->BW, G->k0, tbase, G->d_bits, G->nmed, G->d_mp, G->d_mtc, G->d_mstep);
     CK(cudaGetLastError());
-    k_deep<<<(unsigned)((G->nrec + 255) / 256), 256>>>(G->T, G->I, G->BW, tbase, G->d_bits, G->nrec, G->d_rec);
+    k_deep<<<(unsigned)((G->nrec + 255) / 256), 256>>>(G->T, G->I, G->BW, tbase, G->d_bits, G->nrec, G->d_rec, G->wide);
     CK(cudaGetLastError());
     CK(cudaMemcpy(host_bits, G->d_bits, (size_t)G->T * G->BW * 8, cudaMemcpyDeviceToHost));
     G->cur++; return 0;
@@ -99,5 +101,10 @@ int gbs_block(void *g, uint64_t *host_bits) {
 int64_t gbs_cur(void *g) { return ((gbs_t *)g)->cur; }
 /* v8.56: progression step, set once after gbs_create and before the first block; the host constants must be built for the same S */
 int gbs_set_step(void *g, int64_t S) { gbs_t *G = (gbs_t *)g; if (S < 2 || (S & 1)) return -1; if (G->cur) return -2; G->S = S; return 0; }
+/* v8.57: record layout of the uploaded records - 0 = bsieve.c v2 (bs_records_flat*, I <= 2047), 1 = wide (bs_records_flat_w,
+   I <= 8191); set once after gbs_create, before the first block */
+int gbs_set_format(void *g, int wide) { gbs_t *G = (gbs_t *)g; if (wide != 0 && wide != 1) return -1; if (G->cur) return -2;
+    if ((!wide && G->I > 2047) || (wide && G->I > 8191)) return -3;
+    G->wide = wide; return 0; }
 void gbs_sync(void) { cudaDeviceSynchronize(); }
 }

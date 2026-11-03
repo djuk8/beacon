@@ -163,6 +163,36 @@ int64_t bs_records_flat_s(const int64_t *qd, const int64_t *PEd, int64_t nq, int
     return n;
 }
 int64_t bs_records_flat(const int64_t *qd, const int64_t *PEd, int64_t nq, int64_t k0, int64_t T, int64_t hi, rec_t *out) { return bs_records_flat_s(qd, PEd, nq, k0, T, hi, 2, out); }
+/* v8.57: WIDE packed records for windows wider than the bsieve.c v2 fields allow (I > 2047; rings 1+2 = 4,375 columns):
+   w0 = p (36 bits) | i (13 bits, <<36) | a0+8192 (14 bits, <<49);  w1 = t (44 bits) | b0 (13 bits, <<44);  w2 = a1.   I <= 8191.
+   Read only by gbs.cu / gbs_cpu.c after gbs_set_format(g, 1); bsieve.c (the CPU daemon) keeps the v2 layout. Same per-prime math
+   as bs_records_flat_s (first landing, FK basis), only the packing differs. Returns -2 if I > 8191, -1 if a prime divides S/2. */
+static inline rec_t rec_pack_w(uint64_t p, int64_t t, int32_t i, int32_t a0, int64_t a1, int32_t b0) {
+    rec_t r; r.w0 = p | ((uint64_t)(uint32_t)i << 36) | ((uint64_t)(uint32_t)(a0 + 8192) << 49);
+    r.w1 = (uint64_t)t | ((uint64_t)(uint32_t)b0 << 44); r.w2 = (uint64_t)a1; return r; }
+int64_t bs_records_flat_w(const int64_t *qd, const int64_t *PEd, int64_t nq, int64_t k0, int64_t T, int64_t hi, int64_t S, rec_t *out) {
+    int64_t Sh = hi / 2, I = 2 * Sh + 1, n = 0; if (I > 8191) return -2;
+    for (int64_t q = 0; q < nq; q++) {
+        uint64_t p = (uint64_t)qd[q], pe = (uint64_t)PEd[q] % p; uint64_t B = (2 * pe) % p; if (!B) continue;
+        uint64_t inv2 = (p + 1) / 2, k0m = (uint64_t)(k0 % (int64_t)p);
+        uint64_t i0 = (uint64_t)(((uint64_t)Sh % p + p - mulmod(mulmod(k0m, pe, p), inv2, p)) % p);
+        uint64_t f = (S == 2) ? pe : mulmod((uint64_t)(S / 2) % p, pe, p); if (!f) return -1;
+        uint64_t sp = p - f;
+        int64_t t = fm_next_hit((int64_t)sp, (int64_t)p, (int64_t)i0, I, 0, (int64_t)p); if (t < 0) continue;
+        int32_t i = (int32_t)((i0 + (__uint128_t)(uint64_t)t * sp) % p);
+        int32_t a0, b0; int64_t a1, b1; fk_reduce((int64_t)p, (int64_t)sp, I, &a0, &a1, &b0, &b1);
+        out[n++] = rec_pack_w(p, t, i, a0, a1, b0);
+    }
+    return n;
+}
+/* v8.57: popcount per row over bit columns [c0, c1] only (the ring-1 counts inside a rings-1+2 bitmap) */
+void bs_row_counts_rng(const uint64_t *bits, int64_t T, int64_t BW, int64_t c0, int64_t c1, int32_t *cnt) {
+    int64_t w0 = c0 >> 6, w1 = c1 >> 6; uint64_t m0 = ~0ULL << (c0 & 63), m1 = ((c1 & 63) == 63) ? ~0ULL : ((1ULL << ((c1 & 63) + 1)) - 1);
+    for (int64_t r = 0; r < T; r++) { const uint64_t *w = bits + r * BW; int c = 0;
+        for (int64_t x = w0; x <= w1; x++) { uint64_t v = w[x]; if (x == w0) v &= m0; if (x == w1) v &= m1; c += __builtin_popcountll(v); }
+        cnt[r] = c; }
+}
+const char *bs_api_v857(void) { return "bs_api v8.57 (wide records, ring-1 range counts)"; }
 /* js2 constants for medium primes: tc, step per prime (same formulas as fm_block_js2) */
 int64_t bs_js2_consts_s(int64_t k0, const int64_t *prs, const int64_t *PEm, int64_t np, int64_t hi, int64_t S, int64_t *tc_out, int64_t *step_out) {   /* v8.56: rows k = k0 + S*t; returns #constant-kill primes (must be 0) */
     int64_t Sh = hi / 2, nconst = 0;

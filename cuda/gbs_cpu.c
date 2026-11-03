@@ -22,6 +22,7 @@ typedef struct {
     int64_t nmed; int64_t *mp, *mtc, *mstep;
     uint64_t *wheel;
     int64_t S;
+    int wide;                                                       /* v8.57: record layout (gbs.cu) */
 } gbs_t;
 
 static inline int coprime2310(int64_t k) { return (k % 3) && (k % 5) && (k % 7) && (k % 11); }   /* k odd always */
@@ -54,10 +55,10 @@ static void k_medium(gbs_t *G, int64_t tbase) {
 }
 /* K_C: deep primes (one GPU thread per record) */
 static void k_deep(gbs_t *G, int64_t tbase) {
-    const int64_t T = G->T, I = G->I, BW = G->BW, lim = tbase + T;
+    const int64_t T = G->T, I = G->I, BW = G->BW, lim = tbase + T; const int wide = G->wide;
     for (int64_t q = 0; q < G->nrec; q++) {
         rec_t r = G->rec[q]; int64_t t = R_T(r); if (t >= lim) continue;
-        int64_t x = R_I(r); int32_t a0 = R_A0(r), b0 = R_B0(r); int64_t a1 = R_A1(r); int64_t p = (int64_t)R_P(r);
+        int64_t x = wide ? (int64_t)((r.w0 >> 36) & 8191) : R_I(r); int32_t a0 = wide ? (int32_t)((r.w0 >> 49) & 16383) - 8192 : R_A0(r), b0 = wide ? (int32_t)((r.w1 >> 44) & 8191) : R_B0(r); int64_t a1 = R_A1(r); int64_t p = (int64_t)R_P(r);   /* v8.57: wide layout when set */
         int64_t b1 = (a1 * (int64_t)b0 - p) / a0;                                              /* exact: a0*b1 - a1*b0 = -p */
         while (t < lim) {
             G->bits[(t - tbase) * BW + (x >> 6)] &= ~(1ULL << (x & 63));
@@ -65,7 +66,7 @@ static void k_deep(gbs_t *G, int64_t tbase) {
             else if (x < I - b0)     { x += b0;      t += b1; }
             else                     { x += a0 + b0; t += a1 + b1; }
         }
-        r.w0 = (r.w0 & ~(2047ULL << 36)) | ((uint64_t)(uint32_t)x << 36);
+        r.w0 = (r.w0 & ~((wide ? 8191ULL : 2047ULL) << 36)) | ((uint64_t)(uint32_t)x << 36);
         r.w1 = (r.w1 & ~((1ULL << 44) - 1)) | (uint64_t)t;
         G->rec[q] = r;
     }
@@ -76,7 +77,7 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
                  int64_t nmed, const int64_t *mp, const int64_t *mtc, const int64_t *mstep, const uint64_t *wheel) {
     (void)dev;
     gbs_t *G = (gbs_t *)calloc(1, sizeof *G); if (!G) return NULL;
-    G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed; G->S = 2;
+    G->T = T; G->Sh = hi / 2; G->I = 2 * G->Sh + 1; G->BW = (G->I + 63) / 64; G->k0 = k0; G->nrec = nrec; G->nsm = nsm; G->nmed = nmed; G->S = 2; G->wide = 0;
     #define CP(dst, src, n, ty) do { (dst) = (ty *)malloc((size_t)(n) * sizeof(ty) + 16); if (!(dst)) return NULL; if ((n) > 0) memcpy((dst), (src), (size_t)(n) * sizeof(ty)); } while (0)
     CP(G->rec, records, nrec, rec_t);
     G->bits = (uint64_t *)malloc((size_t)T * G->BW * 8); if (!G->bits) return NULL;
@@ -87,11 +88,17 @@ void *gbs_create(int dev, int64_t T, int64_t hi, int64_t k0, const rec_t *record
 }
 int gbs_block(void *g, uint64_t *host_bits) {
     gbs_t *G = (gbs_t *)g; int64_t tbase = G->cur * G->T;
+    if (!G->wide && G->I > 2047) return -1;                         /* v8.57: as gbs.cu */
     k_rows(G, tbase); k_medium(G, tbase); k_deep(G, tbase);
     memcpy(host_bits, G->bits, (size_t)G->T * G->BW * 8);
     G->cur++; return 0;
 }
 int64_t gbs_cur(void *g) { return ((gbs_t *)g)->cur; }
 int gbs_set_step(void *g, int64_t S) { gbs_t *G = (gbs_t *)g; if (S < 2 || (S & 1)) return -1; if (G->cur) return -2; G->S = S; return 0; }
+/* v8.57: record layout of the uploaded records - 0 = bsieve.c v2 (bs_records_flat*, I <= 2047), 1 = wide (bs_records_flat_w,
+   I <= 8191); set once after gbs_create, before the first block */
+int gbs_set_format(void *g, int wide) { gbs_t *G = (gbs_t *)g; if (wide != 0 && wide != 1) return -1; if (G->cur) return -2;
+    if ((!wide && G->I > 2047) || (wide && G->I > 8191)) return -3;
+    G->wide = wide; return 0; }
 void gbs_sync(void) {}
 const char *gbs_twin(void) { return "gbs_cpu v8.56 (CPU twin of gbs.cu)"; }
