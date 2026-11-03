@@ -18,7 +18,7 @@ Any Linux machine with NVIDIA GPUs, the CUDA 12 toolkit, gcc, git, python3 and p
 
 prints throughput per four-hour slice, the fossil audit, the harvest and the day's best gaps. A healthy box reads about 11,000 windows/s per RTX 5090 with all GPUs at 100% (the first hour ramps). Every gap the hourly harvest walks lands in `~/beacon/raid610/campaign_ledger.log`; `tools/notary_v2.py` re-derives any gap from its tuple, `tools/certify_batch.py` proves the endpoints with ECPP, and the lines those tools print go to the Prime Gap List's submission server.
 
-The seed picks the k-range: k0 = 10^12 + 8·10^9·seed, and boxes must not share one (box1 ran seed 2004; use 2500, 3000, 3500 ... for new machines). The current tree is stamped by `STAMP_20260924.sha256`; `sha256sum -c STAMP_20260924.sha256 --quiet` verifies it.
+The seed picks the k-range: k0 = 10^12 + 8·10^9·seed, and boxes must not share one (box1 ran seed 2004; use 2500, 3000, 3500 ... for new machines). The current tree is stamped by `STAMP_20261103.sha256`; `sha256sum -c STAMP_20261103.sha256 --quiet` verifies it. Since v8.56 a sieve daemon can hunt one residue class of k mod 2310 (knob files SIEVESTEP / SIEVECLASS / SIEVEKBASE / SIEVEBID, see `KIT_v8.56_NOTE.md`); without them a box runs exactly as v8.55.
 
 ## 1. The game, from zero
 
@@ -245,7 +245,7 @@ cuda/       GPU kernel sources (g1_fermat family, gbs.cu GPU sieve) + gate harne
 tools/sieve/ the persistent bucket sieve (C): bsieve.c, bs_api.c, fk_walk.c + referees
 records/    what is on the Prime Gap List: submission lines, the treasury by venue,
             record endpoints, verification chain (certificates ship with the data archive)
-deploy/kit_v8/ the September kit as deployed (o1_kit v8.51)
+deploy/kit_v8/ the current kit as deployed (o1_kit v8.56; notes KIT_v8.5x_NOTE.md)
 docs/       mission, preregistrations, cost calculus, novelty sweep,
             retrodictions, session handoffs
 history/    frozen snapshots of earlier eras (arch2704 construction
@@ -258,7 +258,7 @@ raw manifests, databases) ships as a separate data archive with a DOI.
 
 ## 8. Running it
 
-`deploy/kit_v8/` holds the September kit (o1_kit v8.52) - the machinery that set the record; `deploy/fresh_box.sh` stands it up (quick start below). `history/kit_v1_2026-08/` is the August kit, kept as history.
+`deploy/kit_v8/` holds the current kit (o1_kit v8.56; KIT_v8.5x_NOTE.md describe each step since v8.54) - the machinery that set the records; `deploy/fresh_box.sh` stands it up (quick start below). `history/kit_v1_2026-08/` is the August kit, kept as history.
 
 ## 9. Standing on shoulders
 

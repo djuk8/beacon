@@ -1,4 +1,4 @@
-# Kit v8.56 - single-class hunting (2026-11-02, branch v8.56-single-class, A/B candidate)
+# Kit v8.56 - single-class hunting (built 2026-11-02, released 2026-11-03 after the box-6 A/B)
 
 Why: k's residue class mod 2310 fixes where the swap primes 3, 5, 7, 11 kill (CLASS_RESULT_v0, 2026-10-18). Exact arithmetic gives each
 of the 480 valid classes its value; the best pair is k = 317 / 1993 (mod 2310, mirror classes): rung-6 entries x1.077 per tested
@@ -43,8 +43,19 @@ Gates, sandbox (2 cores, CPU twin), 10/10 PASS:
 - G5 onstart: knobs absent -> launch lines unchanged; SIEVESTEP2=2310 -> the v8.56 arguments
 Box: gates/gate_856.sh adds GB2 (S=2 GPU rings v8.55 == v8.56), GB3 (S=2310 GPU rings == CPU twin), GB4 (every GPU kept window ==
 referee at 1e8); deploy_856.sh demands that receipt, installs the gated binaries by atomic rename, switches the second daemon, restarts
-the ladders once (they must load the new fastmake before a single-class ring reaches rung 2; ~1-2 min of in-flight rings are dropped), and audits the first live single-class
-ring against the referee at production depth (1e10) - a failure rolls back by itself.
+the ladders once (they must load the new fastmake before a single-class ring reaches rung 2; ~1-2 min of in-flight rings are
+dropped), and audits the first live single-class ring against the referee at production depth (1e10) - a failure rolls back by itself.
+Box 6 (vast C.58671874), 2026-11-02: gate_856.sh PASS on card 7, deploy 21:42 UTC, first-ring audit PASS (32 windows at 1e10).
 
-Open: the A/B read (ab856.py read: rung-6 entries per window x1.077, +-2% after ~6 h; walked merit >= 30 x1.22, readable in 3-4 days);
-then the first daemon (class 317), merge to main + stamp; select 24 re-test (each pool is now 99,732 rows of real windows).
+A/B on box 6, 9.2 h, same box and hours: daemon 2 class 1993 from k = 1e15 (1.455e9 windows) vs daemon 1 mixed at k ~ 4.0e14
+(1.571e9 windows). Tests per window 46.0 vs 45.8 (same cost); box 90.6-91.4k w/s per 4-h slice, as before.
+- rung entries per window, single/mixed: r2 x1.020, r4 x1.035, r6 x1.086 [1.072, 1.101] (~12 sigma; predicted x1.077), r7 x1.26
+  [1.13, 1.41]; rung 6 per test x1.082. The single arm sits ~0.93 higher in ln n, which alone adds ~0.7% at rung 6 -> the class part
+  is ~x1.078, the prediction: the first out-of-sample test of the class law.
+- walked merit >= 30 per window x1.44 [1.13, 1.83] (156 vs 117; predicted x1.22, consistent - the era read after ~3 days decides).
+Released: 2026-11-03 ~07:05 UTC daemon 1 moved to class 317 (seed 65000, bids from 1e9; first-ring audit PASS) - box 6 hunts 317 on
+cards 0-3 and 1993 on cards 4-7, both from k = 1e15 (old mixed seeds 50000 / 55000 keep their state for a rollback).
+
+Open: the merit >= 30 era read (ab856.py read --hours 100 after ~3 days: box 6's ~38 h of mixed hunting vs the single-class days);
+select 24 re-test (each pool is now 99,732 rows of real windows; the single-class daemon's GPU stage is 0.05-0.07 s per block).
+Next boxes: 317 / 1993 are used from 1e15 upward (~1.1e14 per day each) - start above (e.g. kbase 1e16) or take 151 / 2159 (x1.12).
