@@ -18,7 +18,7 @@ Any Linux machine with NVIDIA GPUs, the CUDA 12 toolkit, gcc, git, python3 and p
 
 prints throughput per four-hour slice, the fossil audit, the harvest and the day's best gaps. A healthy box reads about 12,000-14,000 windows/s per RTX 5090 with all GPUs at 100% (the first hour ramps). Every gap the hourly harvest walks lands in `~/beacon/raid610/campaign_ledger.log`; `tools/notary_v2.py` re-derives any gap from its tuple, `tools/certify_batch.py` proves the endpoints with ECPP, and the lines those tools print go to the Prime Gap List's submission server.
 
-The seed picks the k-range: since v8.57 a fresh box hunts one residue class of k mod 2310 (317, and 1993 on a second sieve card) from k = 10^16 + seed·10^15, with rings 1 and 2 sieved on the GPU; machines must not share a seed. `--mixed` gives the older all-classes mode (k0 = 10^12 + 8·10^9·seed). The current tree is stamped by `STAMP_20261103.sha256`; `sha256sum -c STAMP_20261103.sha256 --quiet` verifies it. The knob files behind it (SIEVESTEP / SIEVECLASS / SIEVEKBASE / SIEVEBID, SIEVERINGS) are described in `KIT_v8.56_NOTE.md` and `KIT_v8.57_NOTE.md`.
+The seed picks the k-range: since v8.57 a fresh box hunts one residue class of k mod 2310 (317, and 1993 on a second sieve card) from k = 10^16 + seed·10^15, with rings 1 and 2 sieved on the GPU; machines must not share a seed. `--mixed` gives the older all-classes mode (k0 = 10^12 + 8·10^9·seed). The current tree is stamped by `STAMP_20261104.sha256`; `sha256sum -c STAMP_20261104.sha256 --quiet` verifies it. The knob files behind it (SIEVESTEP / SIEVECLASS / SIEVEKBASE / SIEVEBID, SIEVERINGS) are described in `KIT_v8.56_NOTE.md` and `KIT_v8.57_NOTE.md`.
 
 ## 1. The game, from zero
 
