@@ -1,4 +1,4 @@
-# Kit v8.57 - ring 2 deep-sieved on the GPU daemon (built 2026-11-03, branch v8.57-ring2, A/B candidate)
+# Kit v8.57 - ring 2 deep-sieved on the GPU daemon (built 2026-11-03; production on box 6 since 2026-11-04, merged to main)
 
 Why: ring 2 (1568 < |j| <= 4374) costs ~28% of all GPU tests, ~60 tests per window that reaches it, because the ladder sieves it only
 to 1e5 on the CPU. Sieved to the daemon's depth (1e10) its survivors halve (Mertens: ln 1e5 / ln 1e10) and so do its tests: about
@@ -36,3 +36,11 @@ scanhunt), SIEVERINGS2=2 + restart of the second daemon (resumes its own seed), 
 A/B (ab857.py read, daemon 2 vs daemon 1, mirror classes): ring-2 pass rate must not move; round-2 tests per entering window ~x0.5;
 tests per window ~x0.86; rung-6 entries per window ~x1.00; the sieve cards' tests/s and the daemons' "gpu stage" per block show the
 cost. Then daemon 1 (SIEVERINGS=2), merge to main + stamp.
+
+Result on box 6 (8x RTX 5090): daemon 2 switched 2026-11-03 15:14 UTC, daemon 1 2026-11-04 06:39 UTC. A/B after 1.8 h (daemon 2 vs daemon 1):
+tests per window x0.861 (45.96 -> 39.55), round-2 tests per entering window x0.516, rung-6 entries per window x1.001 [0.973, 1.030],
+ring-2 pass rate 0.1867 vs 0.1873 (the start edge: daemon 1's count began with rings in flight); no FAIL/ERROR in the hunt logs. Cost:
+the sieve card's GPU stage 0.13 s vs 0.07 s per block. Projection with both daemons: ~104k windows/s vs ~94k (+11%). First large find
+on the v8.57 path: 59,302 @ 42.0914 (daemon 2, class 1993, 2026-11-04), #3 all-time.
+Fresh boxes (deploy/fresh_box.sh, 2026-11-04): single class + --gpu-rings 2 are the default; --seed is required; k from 1e16 + seed*1e15;
+cards under 16 GB sieve to 1e9. tools/claims_live.py + tools/rewalk.py turn the ledger into checked submission lines (SETUP.md).

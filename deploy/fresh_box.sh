@@ -1,12 +1,18 @@
 #!/bin/bash
 # fresh_box.sh -- a fresh GPU box from the repo tree to a certified, running hunt, in one supervised pass.
 # Written from the first fresh-box test (2026-09-24, 4x RTX 5090): every step below was a stop that day, in this order.
-# Usage: bash deploy/fresh_box.sh [--seed SIEVESEED] [--seed2 SIEVESEED2] [--venue crown|300] [--no-launch]   (8-card boxes: two sieve cards, seed2 defaults to seed+250)     (run as root from the repo root; CUDA 12 toolkit, gcc, python3 with numpy+gmpy2, pari-gp)
-# Seeds: k0 = 1e12 + 8e9*seed. box1 used 2004 (k0 1.70e13, walked to ~1.76e13). New boxes: 2500, 3000, 3500 ... (500 apart = 4e12 in k, ~40 box-days each).
+# Usage: bash deploy/fresh_box.sh --seed N [--kbase K] [--seed2 N2] [--mixed] [--venue crown|300] [--no-launch]   (8-card boxes: two sieve cards, seed2 defaults to seed+250)
+# v8.57 default (crown venue): single-class hunting (k == 317 mod 2310; above 4 cards the second sieve card takes 1993) with rings 1+2 sieved on
+# the GPU, from k = KBASE = 1e16 + N*1e15 (seed N in 1..999 owns 1e15 of k - post yours on the forum so nobody shares it). --mixed = the v8.55 mode.
+# Cards with less than 16 GB get the sieve to 1e9 instead of 1e10 (the 1e10 prime table takes ~11 GB on the sieve card).     (run as root from the repo root; CUDA 12 toolkit, gcc, python3 with numpy+gmpy2, pari-gp)
+# --mixed seeds: k0 = 1e12 + 8e9*seed. box1 used 2004 (k0 1.70e13, walked to ~1.76e13). New boxes: 2500, 3000, 3500 ... (500 apart = 4e12 in k, ~40 box-days each).
 set -uo pipefail
-REPO=$(cd "$(dirname "$0")/.." && pwd); P3=$HOME/beacon/p3; K=$P3/o1_kit; R=$HOME/beacon/raid610; SEED=2500; SEED2=; LAUNCH=1; VENUE=crown
-while [ $# -gt 0 ]; do case $1 in --seed) SEED=$2; shift;; --seed2) SEED2=$2; shift;; --venue) VENUE=$2; shift;; --no-launch) LAUNCH=0;; esac; shift; done
+REPO=$(cd "$(dirname "$0")/.." && pwd); P3=$HOME/beacon/p3; K=$P3/o1_kit; R=$HOME/beacon/raid610; SEED=; SEED2=; KBASE=; MIXED=0; LAUNCH=1; VENUE=crown
+while [ $# -gt 0 ]; do case $1 in --seed) SEED=$2; shift;; --seed2) SEED2=$2; shift;; --venue) VENUE=$2; shift;; --kbase) KBASE=$2; shift;; --mixed) MIXED=1;; --no-launch) LAUNCH=0;; esac; shift; done
 say(){ echo "$(date -u +%FT%TZ) fresh_box: $*"; }; die(){ say "FAIL: $*"; exit 1; }
+[[ "$SEED" =~ ^[0-9]+$ ]] || die "--seed N is required (it picks your k-range; pick an unused one and post it on the forum)"
+if [ "$MIXED" = 0 ] && [ "$VENUE" = crown ]; then [ -n "$KBASE" ] || { [ "$SEED" -ge 1 ] && [ "$SEED" -le 999 ] || die "single-class seeds are 1..999 (or give --kbase K)"; KBASE=$((10**16 + SEED * 10**15)); }
+  [[ "$KBASE" =~ ^[0-9]+$ ]] && [ "$KBASE" -lt 1500000000000000000 ] || die "--kbase must be an integer below 1.5e18 (the 2048-bit class)"; fi
 # 0. prerequisites
 for t in nvcc gcc git nvidia-smi gp; do command -v $t >/dev/null || die "$t not on PATH (CUDA toolkit / build-essential / git / pari-gp)"; done
 PY=$(command -v /venv/main/bin/python3 || command -v python3); $PY -c "import numpy, gmpy2" 2>/dev/null || die "python needs numpy and gmpy2: $PY -m pip install numpy gmpy2"
@@ -27,6 +33,11 @@ cp "$K/canary_2048.bin" "$K/canary_expected.bin" "$K/canary.sh" "$P3/" && chmod 
 ( cd "$P3" && ./g1_fermat_v3 canary_2048.bin /tmp/canary_v0.bin > /dev/null 2>&1 && cmp -s /tmp/canary_v0.bin canary_expected.bin ) || die "canary FAILED on card 0 - driver build or card is bad"; say "canary: driver reproduces the expected verdicts"
 # 3. seed knob, then go_crown does the rest: venue files, residue cache (~15 min), C/CUDA sieve builds, G-L2 gate, crontab, launch
 echo "$SEED" > "$R/SIEVESEED.txt"; [ -n "$SEED2" ] && echo "$SEED2" > "$R/SIEVESEED2.txt"; say "sieve seed $SEED (k0 = $((10**12 + 8*10**9*SEED)))${SEED2:+, second sieve card seed $SEED2}; cards: $NG (above 4, cards 4-7 get their own sieve card)"
+if [ "$MIXED" = 0 ] && [ "$VENUE" = crown ]; then                        # v8.57 start: single class + ring 2 from the GPU (as box 6 runs)
+  echo 2310 > "$R/SIEVESTEP.txt"; echo 317 > "$R/SIEVECLASS.txt"; echo "$KBASE" > "$R/SIEVEKBASE.txt"; echo 2 > "$R/SIEVERINGS.txt"
+  if [ "$NG" -gt 4 ]; then echo 2310 > "$R/SIEVESTEP2.txt"; echo 1993 > "$R/SIEVECLASS2.txt"; echo "$KBASE" > "$R/SIEVEKBASE2.txt"; echo 2 > "$R/SIEVERINGS2.txt"; fi
+  say "single-class from k = $KBASE (class 317$([ "$NG" -gt 4 ] && echo ' + 1993 on the second sieve card')), rings 1+2 on the GPU"; fi
+VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | sort -n | head -1); if [ "${VRAM:-0}" -lt 15000 ] && [ -z "${BSDQ:-}" ]; then export BSDQ=1000000000; say "smallest card ${VRAM} MiB: sieve depth 1e9 (1e10 needs ~11 GB on the sieve card)"; fi
 cp "$K/venue.py" "$R/"; if [ "$VENUE" != crown ]; then [ -f "$K/venue$VENUE.json" ] || die "no venue file venue$VENUE.json in the kit"; cp "$K/venue$VENUE.json" "$R/VENUE.json"; fi
 read VBITS VLAD <<< "$(cd "$R" && PYTHONPATH="$R:$K" $PY -c "import venue; v=venue.load(); print(v['bits'], v['ladder'])")"; say "venue $VENUE (driver class $VBITS bits, ladder $VLAD)"
 [ -s "$R/$VLAD" ] || [ -f "$K/$VLAD" ] && cp "$K/$VLAD" "$R/" 2>/dev/null; [ -s "$R/$VLAD" ] || { say "designing the ladder for this venue (a minute or two)"; ( cd "$R" && PYTHONPATH="$R:$K" $PY "$K/ladder_crown.py" edges > ladder_design.log 2>&1 ); [ -s "$R/$VLAD" ] || die "ladder design failed (see $R/ladder_design.log)"; }
